@@ -20,6 +20,10 @@ end
 mutable struct GameState
     graph::GameGraph
     short_Graph::GameGraph
+    A::GameGraph # Aufspannende Bäume für Short Strategie
+    B::GameGraph #
+    A_cut::GameGraph #Disjunkte Kantenmengen für 
+    B_cut::GameGraph
     current_player::Symbol
     history::Vector{Tuple{Symbol, Edge}}
     winner::Union{Symbol, Nothing}
@@ -31,23 +35,23 @@ mutable struct Element
     s::Union{Element,Nothing}
 end
 
-mutable struct Set
+mutable struct customSet
     head::Element
     tail::Element
     size::Int
 end
 
-function make_set(elem::Element)::Set
-    newSet = Set(elem, elem, 1)
+function make_set(elem::Element)::customSet
+    newSet = customSet(elem, elem, 1)
     elem.parent = newSet
     return newSet
 end
 
-function find_set(elem::Element)::Set
+function find_set(elem::Element)::customSet
     return elem.parent
 end
 
-function union(elem1::Element, elem2::Element)::Set
+function union(elem1::Element, elem2::Element)::Element
     if elem1.parent.size < elem2.parent.size # hänge Liste2 an Liste1, falls Liste2 länger ist, vertausche die Listen
         temp = elem1
         elem1 = elem2
@@ -56,6 +60,9 @@ function union(elem1::Element, elem2::Element)::Set
     parent2 = elem2.parent
     elem1.parent.size += parent2.size
     elem1.parent.tail.s = parent2.head
+    if !isnothing(parent2.tail.s)
+        nothing
+    end
     currentElement = parent2.head
     while !isnothing(currentElement)
         if isnothing(currentElement.s)
@@ -64,12 +71,14 @@ function union(elem1::Element, elem2::Element)::Set
         currentElement.parent = elem1.parent
         currentElement = currentElement.s
     end
-    return elem1.parent
+    return parent2.head
 end
 
 function new_game(g::GameGraph)::GameState
     short_Graph = GameGraph([g.s, g.t], Vector{Edge}(), g.s, g.t)
-    return GameState(g, short_Graph, :short, Vector{Tuple{Symbol, Edge}}(), nothing)
+    A = GameGraph([g.s, g.t], Vector{Edge}(), g.s, g.t)
+    B = GameGraph([g.s, g.t], Vector{Edge}(), g.s, g.t)
+    return GameState(g, short_Graph, A, B, A, B, :short, Vector{Tuple{Symbol, Edge}}(), nothing)
 end
 
 function valid_moves(state::GameState)::Vector{Edge}

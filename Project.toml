@@ -7,10 +7,12 @@ authors = ["Levin <lallalouf@gmail.com>", "Linus <linus.lungwitz@gmail.com>"]
 Cairo = "159f3aea-2a34-519c-b102-8c37f9878175"
 Gtk4 = "9db2cae5-386f-4011-9d63-a5602296539b"
 GtkObservables = "8710efd8-4ad6-11eb-33ea-2d5ceb25a41c"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 Cairo = "1.1.1"
 Gtk4 = "0.7.12"
 GtkObservables = "2.2.2"
+Revise = "3.15.0"
 Test = "1.11.0"
