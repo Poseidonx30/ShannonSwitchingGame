@@ -31,8 +31,8 @@ function short_strategy(state::GameState)::Edge #A,B immer nach jedem Zug aktual
 end 
 
 function search_connecting_edge(u::Vertex, v::Vertex, T1::GameGraph, T2::GameGraph)::Edge
-    comp_u_in_T2 = DFS(u, T2)
-    comp_v_in_T2 = DFS(v, T2)
+    comp_u_in_T2 = DFS(u, T2.edges)
+    comp_v_in_T2 = DFS(v, T2.edges)
 
     for edge in T1.edges 
         if (edge.u ∈ comp_u_in_T2 && edge.v ∈ comp_v_in_T2) || (edge.v ∈ comp_u_in_T2 && edge.u ∈ comp_v_in_T2)
@@ -41,9 +41,9 @@ function search_connecting_edge(u::Vertex, v::Vertex, T1::GameGraph, T2::GameGra
     end 
 end
 
-function DFS(start::Vertex, T::GameGraph)::Base.Set{Vertex}
+function DFS(start::Vertex, E::Vector{Edge})::Base.Set{Vertex}
     adj = Dict{Any, Vector{Edge}}() #Inzidenzliste  
-    for edge in T.edges
+    for edge in E
         push!(get!(() -> Edge[], adj, edge.u), edge)
         push!(get!(() -> Edge[], adj, edge.v), edge)
     end
@@ -57,7 +57,7 @@ function DFS(start::Vertex, T::GameGraph)::Base.Set{Vertex}
             push!(Q, nachbar)
             push!(Vertices, nachbar)
             filter!(e -> e !== edge, adj[nachbar])
-            filter!(e -> e !== edge, adj[u])
+            filter!(e -> e !== edge, adj[v])
             break
         end 
     end 
@@ -73,14 +73,14 @@ function cut_strategy(state::GameState)::Edge #A_cut,B_cut immer nach jedem Zug 
     Valid = Base.Set(valid_moves(state))
     a = state.history[end][2]
     if a ∈ A_t
-        P = find_path(a, A_cut.edges, state.graph)  
+        P = find_path(A_cut.edges, state.graph)  
         if !isempty(P)
             b = rand(Valid ∩ B_t ∩ P)
         else 
             b = rand(Valid ∩ B_t)
         end 
     elseif a ∈ B_t
-        P = find_path(a, B_cut.edges, state.graph)
+        P = find_path(B_cut.edges, state.graph)
         if !isempty(P)
             b = rand(Valid ∩ A_t ∩ P)
         else 
@@ -92,27 +92,22 @@ function cut_strategy(state::GameState)::Edge #A_cut,B_cut immer nach jedem Zug 
     return b 
 end 
 
-function find_path(a::Edge, S::Vector{Edge}, G::GameGraph)::Base.Set{Edge}
-    allowed_edges = append!(setdiff(G.edges, S), a)
-    adj = Dict{Any, Vector{Edge}}() #Inzidenzliste  
-    for edge in allowed_edges
-        push!(get!(() -> Edge[], adj, edge.u), edge)
-        push!(get!(() -> Edge[], adj, edge.v), edge)
-    end
-    get
+function find_path(S::Vector{Edge}, G::GameGraph)::Base.Set{Edge}
+    filter!(e -> e.state == :neutral, S)
+    allowed_edges = setdiff(G.edges, S)  #Kanten von G ohne die neutralen Kanten von A bzw. B 
+    return DFS(G.s, G.t, allowed_edges)
 end
 
-function FC(Sehne::Edge, Spannbaum::GameGraph)
+function DFS(s::Vertex, t::Vertex, E::Vector{Edge})::Base.Set{Edge}
     adj = Dict{Any, Vector{Edge}}()
-    for edge in Spannbaum.edges
+    for edge in E
         push!(get!(() -> Edge[], adj, edge.u), edge)
         push!(get!(() -> Edge[], adj, edge.v), edge)
     end
-
-    cumulated_Edges = [Sehne] #aktuell besuchter Weg 
-    S = Base.Set([Sehne.u])  #Besuchte Knoten
-    Q = [Sehne.u]  #Stack
-    while !isempty(Q) && Q[end] !== Sehne.v
+    cumulated_Edges = [] #aktuell besuchter Weg 
+    S = Base.Set([s])  #Besuchte Knoten
+    Q = [s]  #Stack
+    while !isempty(Q) && Q[end] !== t
         u = Q[end]
         found_edge = false
         for edge in adj[u] 
@@ -126,6 +121,41 @@ function FC(Sehne::Edge, Spannbaum::GameGraph)
                 filter!(e -> e !== edge, adj[u])
                 break
             end 
+        end
+        if !found_edge   #Sackgasse
+            pop!(Q)
+            if !isempty(cumulated_Edges)
+                pop!(cumulated_Edges) # Die hinführende Kante entfernen
+            end
+        end
+    end    
+    return Base.Set(cumulated_Edges)
+end
+
+function FC(Sehne::Edge, Spannbaum::GameGraph)::Base.Set{Edge}
+    adj = Dict{Any, Vector{Edge}}()
+    for edge in Spannbaum.edges
+        push!(get!(() -> Edge[], adj, edge.u), edge)
+        push!(get!(() -> Edge[], adj, edge.v), edge)
+    end
+
+    cumulated_Edges = [Sehne] #aktuell besuchter Weg 
+    #S = Base.Set([Sehne.u])  #Besuchte Knoten - nicht notwendig, da Spannbaum 
+    Q = [Sehne.u]  #Stack
+    while !isempty(Q) && Q[end] !== Sehne.v
+        u = Q[end]
+        found_edge = false
+        for edge in adj[u] 
+            nachbar = (edge.u === u) ? edge.v : edge.u
+            #if nachbar ∉ S
+                #push!(S, nachbar)
+                push!(Q, nachbar)
+                push!(cumulated_Edges, edge)
+                found_edge = true
+                filter!(e -> e !== edge, adj[nachbar])
+                filter!(e -> e !== edge, adj[u])
+                break
+            #end 
         end
         if !found_edge   #Sackgasse
             pop!(Q)
