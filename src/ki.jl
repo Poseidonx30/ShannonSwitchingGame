@@ -31,8 +31,8 @@ function short_strategy(state::GameState)::Edge #A,B immer nach jedem Zug aktual
 end 
 
 function search_connecting_edge(u::Vertex, v::Vertex, T1::GameGraph, T2::GameGraph)::Edge
-    comp_u_in_T2 = DFS(u, T2.edges)
-    comp_v_in_T2 = DFS(v, T2.edges)
+    comp_u_in_T2 = DFS(u, T2.edges)[1]
+    comp_v_in_T2 = DFS(v, T2.edges)[1]
 
     for edge in T1.edges 
         if (edge.u ∈ comp_u_in_T2 && edge.v ∈ comp_v_in_T2) || (edge.v ∈ comp_u_in_T2 && edge.u ∈ comp_v_in_T2)
@@ -41,27 +41,29 @@ function search_connecting_edge(u::Vertex, v::Vertex, T1::GameGraph, T2::GameGra
     end 
 end
 
-function DFS(start::Vertex, E::Vector{Edge})::Base.Set{Vertex}
+function DFS(start::Vertex, E::Vector{Edge})::Tuple{Base.Set{Vertex}, Base.Set{Edge}} #Darf nur mit Bäumen verwendet werden!!! (sost werden Knoten mehrfach besucht)
     adj = Dict{Any, Vector{Edge}}() #Inzidenzliste  
     for edge in E
         push!(get!(() -> Edge[], adj, edge.u), edge)
         push!(get!(() -> Edge[], adj, edge.v), edge)
     end
-    Vertices = Set{Vertex}([start])
+    Vertices = Base.Set{Vertex}([start])
+    Edges = Base.Set{Edge}()
     Q = [start]
 
     while !isempty(Q)
         v = pop!(Q)
-        for edge in adj[v]
+        for edge in get(adj, v, Edge[])
             nachbar = (edge.u === v) ? edge.v : edge.u
             push!(Q, nachbar)
             push!(Vertices, nachbar)
+            push!(Edges, edge)
             filter!(e -> e !== edge, adj[nachbar])
             filter!(e -> e !== edge, adj[v])
             break
         end 
     end 
-    return Vertices
+    return Vertices, Edges
 end
 
 function cut_strategy(state::GameState)::Edge #A_cut,B_cut immer nach jedem Zug aktualisiert im state
@@ -110,7 +112,7 @@ function DFS(s::Vertex, t::Vertex, E::Vector{Edge})::Base.Set{Edge}
     while !isempty(Q) && Q[end] !== t
         u = Q[end]
         found_edge = false
-        for edge in adj[u] 
+        for edge in get(adj, u, Edge[])
             nachbar = (edge.u === u) ? edge.v : edge.u
             if nachbar ∉ S
                 push!(S, nachbar)
@@ -145,7 +147,7 @@ function FC(Sehne::Edge, Spannbaum::GameGraph)::Base.Set{Edge}
     while !isempty(Q) && Q[end] !== Sehne.v
         u = Q[end]
         found_edge = false
-        for edge in adj[u] 
+        for edge in get(adj, u, Edge[]) 
             nachbar = (edge.u === u) ? edge.v : edge.u
             #if nachbar ∉ S
                 #push!(S, nachbar)
@@ -183,6 +185,7 @@ function Augment(T1::GameGraph, T2::GameGraph, e::Edge)::Bool
     parent = Dict{Edge, Edge}()
     L = FC(e, T1)
     Lp = Base.Set{Edge}()
+    k = 0
     while !issetequal(L, Lp)
         Lp = L
         if k % 2 == 0
@@ -194,8 +197,8 @@ function Augment(T1::GameGraph, T2::GameGraph, e::Edge)::Bool
         if !isempty(intersect(L,TEdges))
             f = rand(collect(intersect(L,TEdges)))
             x = f
-            chain = Vector{Edge}(f)
-            while x ∈ parent
+            chain = [f]
+            while x ∈ keys(parent)
                 x = parent[x]
                 chain = pushfirst!(chain, x)
             end
@@ -204,7 +207,7 @@ function Augment(T1::GameGraph, T2::GameGraph, e::Edge)::Bool
             unevenChain = [chain[i] for i in eachindex(chain) if i % 2 != 0]
             append!(T1.edges, [chain[i] for i in eachindex(evenChain)])
             T1.edges = [edge for edge in T1.edges if edge ∉ unevenChain]
-            appen!(T2.edges, [chain[i] for i in eachindex(unevenChain)])
+            append!(T2.edges, [chain[i] for i in eachindex(unevenChain)])
             T2.edges = [edge for edge in T2.edges if edge ∉ evenChain]
             return true
         end
@@ -214,6 +217,7 @@ function Augment(T1::GameGraph, T2::GameGraph, e::Edge)::Bool
                 parent[edge2] = edge
             end
         end
+        k += 1  
     end
     return false
 end
@@ -236,4 +240,34 @@ function kruskal(G::GameGraph)::GameGraph
         end
     end
     return GameGraph(G.vertices, edges , G.s, G.t)
+end
+
+function MaximallyDistantTrees(G::GameGraph, T1::GameGraph, T2::GameGraph) #Funktioniert noch nicht (Augment auch nicht sicher)
+    changed = true
+    while changed 
+        common_edges = gemeinsame_Sehnen(G, T1, T2)
+        changed = false
+        for sehne in common_edges
+            if Augment(T1, T2, sehne)
+                changed = true 
+            end 
+        end
+    end 
+    println(T1.edges)
+    println(T2.edges)
+    common_neutral = intersect(filter(e -> e.state == :neutral, T1.edges), filter(e -> e.state == :neutral, T2.edges))
+    setdiff!(T1.edges, common_neutral)
+    setdiff!(T2.edges, common_neutral)
+    v1, e2 = DFS(G.s, T1.edges)
+    if G.t ∉ v1
+        T1.edges, T1.vertices, T2.edges, T2.vertices = [], [], [], []
+    else
+        v2, e2 = DFS(G.s, T2.edges)
+        if G.t ∉ v2 #kann man sich sparen denke ich
+            T1.edges, T1.vertices, T2.edges, T2.vertices = [], [], [], []
+        else
+            T1.vertices = collect(v1), T1.edges = collect(e1), T2.vertices = collect(v2), T2.edges = collect(e2)
+        end 
+    end 
+    return T1, T2
 end
