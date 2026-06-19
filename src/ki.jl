@@ -185,7 +185,7 @@ function Augment(T1::GameGraph, T2::GameGraph, e::Edge)::Bool
     parent = Dict{Edge, Edge}()
     L = FC(e, T1)
     Lp = Base.Set{Edge}()
-    k = 0
+    k = 1
     while !issetequal(L, Lp)
         Lp = L
         if k % 2 == 0
@@ -205,15 +205,15 @@ function Augment(T1::GameGraph, T2::GameGraph, e::Edge)::Bool
             push!(T1.edges, e)
             evenChain = [chain[i] for i in eachindex(chain) if i % 2 == 0]
             unevenChain = [chain[i] for i in eachindex(chain) if i % 2 != 0]
-            append!(T1.edges, [chain[i] for i in eachindex(evenChain)])
+            append!(T1.edges, [evenChain[i] for i in eachindex(evenChain)])
             T1.edges = [edge for edge in T1.edges if edge ∉ unevenChain]
-            append!(T2.edges, [chain[i] for i in eachindex(unevenChain)])
+            append!(T2.edges, [unevenChain[i] for i in eachindex(unevenChain)])
             T2.edges = [edge for edge in T2.edges if edge ∉ evenChain]
             return true
         end
         for edge in L
             for edge2 in setdiff(FC(edge,T), L)
-                L = union(L, edge2)
+                push!(L, edge2)
                 parent[edge2] = edge
             end
         end
@@ -248,12 +248,12 @@ function MaximallyDistantTrees(G::GameGraph, T1::GameGraph, T2::GameGraph) #Funk
         common_edges = gemeinsame_Sehnen(G, T1, T2)
         changed = false
         for sehne in common_edges
+            common_edges = gemeinsame_Sehnen(G, T1, T2)
             if Augment(T1, T2, sehne)
                 changed = true 
-            end 
+            end
         end
     end 
-    println(T1.edges)
     println(T2.edges)
     common_neutral = intersect(filter(e -> e.state == :neutral, T1.edges), filter(e -> e.state == :neutral, T2.edges))
     setdiff!(T1.edges, common_neutral)
@@ -274,3 +274,9 @@ function MaximallyDistantTrees(G::GameGraph, T1::GameGraph, T2::GameGraph) #Funk
     end 
     return T1, T2
 end
+
+#=
+function nextMove(game::GameState)
+    disjointA = 
+end
+=#
