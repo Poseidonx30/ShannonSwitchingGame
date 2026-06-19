@@ -138,6 +138,7 @@ function random_graph(n::Int, m::Int; weighted=false)::Union{GameGraph, Nothing}
                 push!(Anzahl_Knoten_auf_fundamentalen_Wegen, 1)
             end
         end 
+        println(Anzahl_Knoten_auf_fundamentalen_Wegen)
         Kanten_id = 1
         Edges = Vector{Edge}()
         for i in 1:1:Anzahl_Fundamentale_Wege
