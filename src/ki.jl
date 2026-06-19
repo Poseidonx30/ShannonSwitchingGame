@@ -258,7 +258,7 @@ function MaximallyDistantTrees(G::GameGraph, T1::GameGraph, T2::GameGraph) #Funk
     common_neutral = intersect(filter(e -> e.state == :neutral, T1.edges), filter(e -> e.state == :neutral, T2.edges))
     setdiff!(T1.edges, common_neutral)
     setdiff!(T2.edges, common_neutral)
-    v1, e2 = DFS(G.s, T1.edges)
+    v1, e1 = DFS(G.s, T1.edges)
     if G.t ∉ v1
         T1.edges, T1.vertices, T2.edges, T2.vertices = [], [], [], []
     else
@@ -266,7 +266,10 @@ function MaximallyDistantTrees(G::GameGraph, T1::GameGraph, T2::GameGraph) #Funk
         if G.t ∉ v2 #kann man sich sparen denke ich
             T1.edges, T1.vertices, T2.edges, T2.vertices = [], [], [], []
         else
-            T1.vertices = collect(v1), T1.edges = collect(e1), T2.vertices = collect(v2), T2.edges = collect(e2)
+            T1.vertices = collect(v1)
+            T1.edges = collect(e1)
+            T2.vertices = collect(v2) 
+            T2.edges = collect(e2)
         end 
     end 
     return T1, T2

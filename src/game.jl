@@ -123,7 +123,7 @@ function random_graph(n::Int, m::Int; weighted=false)::Union{GameGraph, Nothing}
         println("Langweilig! Wähle mindestens n Kanten und mindestens 4 Knoten aber nicht zu viele Kanten")
         return nothing 
     elseif weighted == false
-        Anzahl_Fundamentale_Wege = rand(2:1:min(m-n+2, floor(Int, m/2)))
+        Anzahl_Fundamentale_Wege = rand(2:1:min(m-n+2, floor(Int, m/2), n-2))
         Knoten = [Vertex(i) for i in 1:1:n]
         s = Knoten[1]
         t = Knoten[n]
@@ -138,7 +138,6 @@ function random_graph(n::Int, m::Int; weighted=false)::Union{GameGraph, Nothing}
                 push!(Anzahl_Knoten_auf_fundamentalen_Wegen, 1)
             end
         end 
-        println(Anzahl_Knoten_auf_fundamentalen_Wegen)
         Kanten_id = 1
         Edges = Vector{Edge}()
         for i in 1:1:Anzahl_Fundamentale_Wege
@@ -157,7 +156,9 @@ function random_graph(n::Int, m::Int; weighted=false)::Union{GameGraph, Nothing}
         for edge in Edges 
             push!(used, (min(edge.u.id, edge.v.id), max(edge.u.id, edge.v.id)))
         end
-        while length(Edges) < m
+        k = 1
+        while length(Edges) < m && k <= 4*m
+            k += 1
             i = rand(2:n-1)
             j = rand(setdiff(2:n-1, [i]))
             a, b = min(i, j), max(i, j)
@@ -168,6 +169,14 @@ function random_graph(n::Int, m::Int; weighted=false)::Union{GameGraph, Nothing}
             push!(Edges, Edge(Kanten_id, Knoten[i], Knoten[j], 0.0, :neutral))
             Kanten_id += 1
         end  
+        if length(Edges) < m
+            for j in length(Edges)+1:m
+                i = rand(2:n-1)
+                j = rand(setdiff(2:n-1, [i]))
+                push!(Edges, Edge(Kanten_id, Knoten[i], Knoten[j], 0.0, :neutral))
+                Kanten_id += 1
+            end
+        end
         return GameGraph(Knoten, Edges, s, t)
     else 
         println("Coming soon!")
