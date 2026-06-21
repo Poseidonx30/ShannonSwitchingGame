@@ -82,7 +82,7 @@ function new_game(g::GameGraph)::GameState
 end
 
 function valid_moves(state::GameState)::Vector{Edge}
-    return state.graph.edges
+    return filter(e -> e.state == :neutral, state.graph.edges)
 end
 
 function make_move!(state::GameState, e::Edge)::Nothing
