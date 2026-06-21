@@ -219,7 +219,6 @@ function computer_move!()
         end
 
         if edge !== nothing
-            println(edge)
             make_move!(state, edge)
             update_game_status!()
             Gtk4.draw(canvas)
@@ -254,7 +253,7 @@ function init_game!(vs_computer::Bool)
     # Globale Zustände setzen
     current_graph[] = new_g
     current_game_state[] = new_game(new_g)
-
+    
     if vs_computer
         # Zufällig bestimmen, wer anfängt. Der erste Spieler ist immer :short!
         if rand(Bool)
