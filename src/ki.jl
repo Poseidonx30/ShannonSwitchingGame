@@ -251,6 +251,7 @@ function MaximallyDistantTrees(G::GameGraph, T1::GameGraph, T2::GameGraph) #Funk
             common_edges = gemeinsame_Sehnen(G, T1, T2)
             if Augment(T1, T2, sehne)
                 changed = true 
+                println(T1.edges)
             end
         end
     end 
