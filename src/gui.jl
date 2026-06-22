@@ -244,24 +244,6 @@ function run_gui()
     end
 
     """
-        available_edges(state::GameState)::Vector{Edge}
-
-    Gibt alle Kanten zurück, die noch neutral sind und deshalb angeklickt
-    werden dürfen.
-
-    # Beispiel
-    ```julia
-    julia> length(available_edges(state))
-    7
-    ```
-    """
-    function available_edges(state::GameState)::Vector{Edge}
-        # Cut-Kanten werden aus state.graph.edges gelöscht. Short-Kanten bleiben
-        # im Graphen, sind aber nicht mehr neutral.
-        return [edge for edge in state.graph.edges if edge.state == :neutral]
-    end
-
-    """
         set_status!(text::String)
 
     Schreibt eine Meldung in die Statuszeile der GUI.
@@ -396,10 +378,8 @@ function run_gui()
         state = current_game_state[]
         if state === nothing
             set_status!("Bitte n, m und beide Namen eingeben und ein neues Spiel starten.")
-        elseif state.winner !== nothing
-            set_status!("Spiel beendet. $(player_name(state.winner)) gewinnt.")
         elseif is_computer_turn(state)
-            set_status!("$(player_name(state.current_player)) ist am Zug.")
+            set_status!("$(player_name(state.current_player)) ist am Zug. Klicke auf eine freie Kante.")
         else
             set_status!("$(player_name(state.current_player)) ist am Zug. Klicke auf eine freie Kante.")
         end
@@ -679,7 +659,7 @@ function run_gui()
         best_edge = nothing
         best_distance = CLICK_DISTANCE
 
-        for edge in available_edges(state)
+        for edge in valid_moves(state)
             x1, y1 = positions[edge.u.id]
             x2, y2 = positions[edge.v.id]
             distance = distance_to_drawn_edge(x, y, x1, y1, x2, y2, visual_offset(edge, offsets))
@@ -812,7 +792,7 @@ function run_gui()
     ```
     """
     function random_computer_edge(state::GameState)
-        edges = available_edges(state)
+        edges = valid_moves(state)
         return isempty(edges) ? nothing : rand(edges)
     end
 
@@ -835,14 +815,14 @@ function run_gui()
         if state.current_player == :short && isdefined(@__MODULE__, :short_strategy)
             try
                 edge = short_strategy(state)
-                edge in available_edges(state) && return edge
+                return edge
             catch
                 return random_computer_edge(state)
             end
         elseif state.current_player == :cut && isdefined(@__MODULE__, :cut_strategy)
             try
                 edge = cut_strategy(state)
-                edge in available_edges(state) && return edge
+                return edge
             catch
                 return random_computer_edge(state)
             end

@@ -4,8 +4,6 @@ function short_strategy(state::GameState)#::Edge #A,B immer nach jedem Zug aktua
         T1 = kruskal(state.graph)
         T2 = d_copy(T1)
         state.A, state.B = MaximallyDistantTrees(state.graph, T1, T2)
-        println(state.A.edges)
-        println(state.B.edges)
         pop!(state.graph.edges)
     end 
     if isempty(state.A.edges) && isempty(state.B.edges)  #Falls es keine Gewinnstrategie gibt
@@ -381,7 +379,7 @@ function MaximallyDistantTrees(G::GameGraph, T1::GameGraph, T2::GameGraph)
         idx = findfirst(x -> x.id == vertex.id, G.vertices)
         push!(new_vertices_T2, G.vertices[idx])
     end 
-    for edge in G.edges
+    for edge in T2.edges
         idx = findfirst(x -> isequal(x, edge), G.edges)
         push!(new_edges_T2, G.edges[idx])
     end 
