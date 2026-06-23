@@ -2,7 +2,7 @@ function short_strategy(state::GameState)#::Edge #A,B immer nach jedem Zug aktua
     if isempty(state.A.edges) && isempty(state.B.edges)      
         push!(state.graph.edges, Edge(0, state.graph.s, state.graph.t, 0.0, :neutral)  )
         T1 = kruskal(state.graph)
-        T2 = d_copy(T1)
+        T2 = kruskal(state.graph)
         state.A, state.B = MaximallyDistantTrees(state.graph, T1, T2)
         pop!(state.graph.edges)
     end 
@@ -83,10 +83,6 @@ function DFS(start::Vertex, E::Vector{Edge})::Tuple{Base.Set{Vertex}, Base.Set{E
 end
 
 function cut_strategy(state::GameState)::Edge #A_cut,B_cut immer nach jedem Zug aktualisiert im state
-   #=  if isempty(state.A_cut.edges) && isempty(state.B_cut.edges)
-        A_cut = ...
-        B_cut = ...
-    end =#
     isempty(state.A_cut.edges) && isempty(state.B_cut.edges) && return rand(valid_moves(state)) #Falls es keine Gewinnstrategie gibt
     A_t = Base.Set(A_cut.edges)
     B_t = Base.Set(B_cut.edges)
@@ -363,7 +359,7 @@ end
 
 function MaximallyDistantTrees(G::GameGraph, T1::GameGraph, T2::GameGraph)
     changed = true
-    while changed 
+    #= while changed 
         common_edges = gemeinsame_Sehnen(G, T1, T2)
         changed = false
         for sehne in common_edges
@@ -372,19 +368,12 @@ function MaximallyDistantTrees(G::GameGraph, T1::GameGraph, T2::GameGraph)
                 break
             end
         end
-    end 
-    new_vertices_T2 = Vector{Vertex}()
-    new_edges_T2 = Vector{Edge}()
-    for vertex in T2.vertices
-        idx = findfirst(x -> x.id == vertex.id, G.vertices)
-        push!(new_vertices_T2, G.vertices[idx])
-    end 
-    for edge in T2.edges
-        idx = findfirst(x -> isequal(x, edge), G.edges)
-        push!(new_edges_T2, G.edges[idx])
-    end 
-    T2.vertices, T2.edges = new_vertices_T2, new_edges_T2
-    common_neutral = intersect(filter(e -> e.state == :neutral, T1.edges), filter(e -> e.state == :neutral, T2.edges))
+    end  =#
+    common_edges = gemeinsame_Sehnen(G, T1, T2)
+    for sehne in common_edges
+        Augment(T1, T2, sehne)
+    end
+    common_neutral = intersect(filter(e -> e.state == :neutral, T1.edges), filter(e -> e.state == :neutral, T2.edges)) #Funktioniert nicht!
     setdiff!(T1.edges, common_neutral)
     setdiff!(T2.edges, common_neutral)
     v1, e1 = DFS(G.s, T1.edges)
@@ -404,6 +393,6 @@ function MaximallyDistantTrees(G::GameGraph, T1::GameGraph, T2::GameGraph)
     return T1, T2
 end
 
-function d_copy(G::GameGraph)
+#= function d_copy(G::GameGraph)
     return GameGraph(copy(G.vertices), copy(G.edges), G.s, G.t)
-end
+end =#
