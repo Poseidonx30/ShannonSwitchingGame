@@ -764,38 +764,6 @@ function run_gui()
     end
 
     """
-        random_computer_edge(state::GameState)
-
-    Wählt zufällig eine noch verfügbare Kante. Das ist der Fallback, falls die
-    optimale Strategie aus `ki.jl` keinen gültigen Zug liefert.
-
-    # Beispiel
-    ```julia
-    julia> random_computer_edge(state)
-    Edge(...)
-    ```
-    """
-    function random_computer_edge(state::GameState)
-        edges = valid_moves(state)
-        return isempty(edges) ? nothing : rand(edges)
-    end
-
-    """
-        computer_edge(state::GameState)
-
-    Bestimmt den nächsten Zug des Computers. 
-
-    # Beispiel
-    ```julia
-    julia> computer_edge(state)
-    Edge(...)
-    ```
-    """
-    function computer_edge(state::GameState)
-        return chase(state)
-    end
-
-    """
         computer_move!()
 
     Führt automatisch einen Computerzug aus, falls gerade der Computer am Zug
@@ -809,10 +777,8 @@ function run_gui()
     function computer_move!()
         state = current_game_state[]
         (state === nothing || state.winner !== nothing || !is_computer_turn(state)) && return
-
-        edge = computer_edge(state)
+        edge = chase(state)
         edge === nothing && return
-
         make_move!(state, edge)
         refresh!()
     end
@@ -1089,6 +1055,9 @@ function run_gui()
         cut_player_name[] = cut_name
         current_graph[] = graph
         current_game_state[] = new_game(graph)
+        if is_computer_game()
+            who_can_win(current_game_state[]) 
+        end
         refresh!()
         computer_move!()
     end
