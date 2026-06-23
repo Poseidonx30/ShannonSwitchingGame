@@ -764,22 +764,6 @@ function run_gui()
     end
 
     """
-        play_edge!(state::GameState, edge::Edge)
-
-    Spielt eine neutrale Kante für den aktuellen Spieler. Die eigentliche
-    Regelprüfung und Gewinnerprüfung übernimmt `make_move!` aus `game.jl`.
-
-    # Beispiel
-    ```julia
-    julia> play_edge!(state, edge)
-    ```
-    """
-    function play_edge!(state::GameState, edge::Edge)
-        edge.state == :neutral || return
-        make_move!(state, edge)
-    end
-
-    """
         random_computer_edge(state::GameState)
 
     Wählt zufällig eine noch verfügbare Kante. Das ist der Fallback, falls die
@@ -799,9 +783,7 @@ function run_gui()
     """
         computer_edge(state::GameState)
 
-    Bestimmt den nächsten Zug des Computers. Wenn `short_strategy` oder
-    `cut_strategy` funktioniert, wird diese Strategie benutzt; sonst wird
-    zufällig gezogen.
+    Bestimmt den nächsten Zug des Computers. 
 
     # Beispiel
     ```julia
@@ -810,25 +792,7 @@ function run_gui()
     ```
     """
     function computer_edge(state::GameState)
-        # Wenn ki.jl eine funktionierende Strategie bereitstellt, nutzt die GUI
-        # sie automatisch. Bis dahin bleibt das Spiel mit Zufallszug spielbar.
-        if state.current_player == :short && isdefined(@__MODULE__, :short_strategy)
-            try
-                edge = short_strategy(state)
-                return edge
-            catch
-                return random_computer_edge(state)
-            end
-        elseif state.current_player == :cut && isdefined(@__MODULE__, :cut_strategy)
-            try
-                edge = cut_strategy(state)
-                return edge
-            catch
-                return random_computer_edge(state)
-            end
-        end
-
-        return random_computer_edge(state)
+        return chase(state)
     end
 
     """
@@ -849,7 +813,7 @@ function run_gui()
         edge = computer_edge(state)
         edge === nothing && return
 
-        play_edge!(state, edge)
+        make_move!(state, edge)
         refresh!()
     end
 
@@ -1176,7 +1140,7 @@ function run_gui()
         edge = clicked_edge(state, x, y)
         edge === nothing && return
 
-        play_edge!(state, edge)
+        make_move!(state, edge)
         refresh!()
         computer_move!()
     end

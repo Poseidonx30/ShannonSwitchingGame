@@ -20,10 +20,8 @@ end
 mutable struct GameState
     graph::GameGraph
     short_Graph::GameGraph
-    A::GameGraph # Aufspannende Bäume für Short Strategie
-    B::GameGraph #
-    A_cut::GameGraph #Disjunkte Kantenmengen für 
-    B_cut::GameGraph
+    A::GameGraph 
+    B::GameGraph 
     has_winning_strategy::Symbol
     current_player::Symbol
     history::Vector{Tuple{Symbol, Edge}}
@@ -79,7 +77,7 @@ function new_game(g::GameGraph)::GameState
     short_Graph = GameGraph([g.s, g.t], Vector{Edge}(), g.s, g.t)
     A = GameGraph([g.s, g.t], Vector{Edge}(), g.s, g.t)
     B = GameGraph([g.s, g.t], Vector{Edge}(), g.s, g.t)
-    return GameState(g, short_Graph, A, B, A, B, :neutral, :short, Vector{Tuple{Symbol, Edge}}(), nothing)
+    return GameState(g, short_Graph, A, B, :neutral, :short, Vector{Tuple{Symbol, Edge}}(), nothing)
 end
 
 function valid_moves(state::GameState)::Vector{Edge}
