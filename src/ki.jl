@@ -407,3 +407,117 @@ end
 function d_copy(G::GameGraph)
     return GameGraph(copy(G.vertices), copy(G.edges), G.s, G.t)
 end
+
+# Chase:
+function chase(g::GameState)
+    if g.has_winning_strategy == :neutral # wir sind im ersten Zug
+        T1 = kruskal(g.graph)
+        T2 = d_copy(T1)
+        Sehnen = collect(gemeinsame_Sehnen(g.graph, T1, T2))
+        push!(Sehnen, Edge(-1, g.graph.s, g.graph.t, 0.0, :neutral))
+        push!(Sehnen, Edge(-2, g.graph.s, g.graph.t, 0.0, :neutral))
+        i = 1
+        while i ≤ length(Sehnen) && !isempty(intersect(T1.edges, T2.edges))
+            b = Sehnen[i]
+            Layers = Vector{Base.Set{Edge}}()
+            push!(Layers, Base.Set([b]))
+            parent = Dict{Edge, Edge}()
+            k=1
+            while k ≤ length(g.graph.vertices)
+                T = k%2 == 0 ? T2 : T1
+                next_T = k%2 == 0 ? T1 : T2
+                new_set = Base.Set{Edge}()
+                for elem ∈ Layers[k]
+                    fc = setdiff(FC(elem, T), [elem])
+                    # println(elem.id, " ", [elem.id for elem in FC(elem, T)], " ", k)
+                    for elem2 ∈ fc
+                        parent[elem2] = elem
+                    end
+                    new_set = Base.union(new_set, fc)
+                end
+                push!(Layers, new_set)
+                if k ≥ 2 && issetequal(Base.Set([edge.id for edge in Layers[k-1]]), Base.Set([edge.id for edge in Layers[k+1]])) # dann ist der Augmentierungsschritt fehlgeschlagen
+                    break
+                elseif k ≥ 2
+                    S = intersect(setdiff(Layers[k+1], Layers[k-1]), next_T.edges)
+                else
+                    S = intersect(Layers[k+1], next_T.edges)
+                end
+                if !isempty(S)
+                    bk = collect(S)[1]
+                    chain = Vector{Edge}()
+                    push!(chain, bk)
+                    x = bk
+                    for x ∈ keys(parent)
+                        pushfirst!(chain, parent[x])
+                        x = parent[x]
+                    end
+                    push!(T1.edges, Sehnen[i])
+                    even_chain = [chain[i] for i in eachindex(chain) if i % 2 == 0]
+                    uneven_chain = [chain[i] for i in eachindex(chain) if i % 2 == 1]
+                    println(even_chain)
+                    println(uneven_chain)
+                    append!(T1.edges, even_chain)
+                    append!(T2.edges, uneven_chain)
+                    T1.edges = [edge for edge in T1.edges if edge ∉ uneven_chain]
+                    T2.edges = [edge for edge in T2.edges if edge ∉ even_chain]
+                    break
+                    #=
+                    penultimate_layer = collect(Layers[k-1])
+                    for i in eachindex(penultimate_layer)
+                        if bk ∈ FC(penultimate_layer[i], T) # sollte das nicht T_k-1 sein?
+                            if k%2 == 0
+                                T2.edges = [edge for edge in T2.edges if ]
+                            break
+                        end
+                    end
+                    =#
+                end
+                k += 1
+            end
+            i += 1
+        end
+        return T1, T2
+        #=
+        g.A, g.B = MaximallyDistantTrees(G.graph, T1, T2)
+        second_imaginary = findfirst(x -> x.id == -2, state.A.edges)
+        first_imaginary = findfirst(x -> x.id == -1, state.B.edges)
+        if !isnothing(first_imaginary) || !isnothing(second_imaginary)
+            g.has_winning_strategy = :cut
+        else
+            g.has_winning_strategy = :short
+        end
+        =#
+    else
+        if g.has_winning_strategy == g.current_player # Computer kann gewinnen
+            last_move_id = isempty(g.history) ? -1 : g.history[end][2].id
+            if last_move_id ∉ symdiff([edge.id for edge in T1.edges], [edge.id for edge in T2.edges])
+                return random(valid_moves(g)) # Invariante bleibt erhalten
+            else
+                if last_move_id ∈ [edge.id for edge in T1.edges]
+                    T = T1
+                    T_alt = T2
+                else
+                    T = T2
+                    T_alt = T1
+                end
+                next_move = nothing
+                for move in valid_moves(g)
+                    if move ∈ setdiff(FC(T.edges[findfirst(x -> x.id == -1, T.edges)], T_alt), [T.edges[findfirst(x -> x.id == -1, T.edges)]]) && last_move_id ∈ setdiff([edge.id for edge in setdiff(FC(move,T), [move])])
+                        next_move = move
+                    end
+                end
+                if g.current_player == :cut
+                    T_alt.edges = [edge for edge in T_alt.edges if edge.id != next_move.id]
+                    push!(T_alt.edges, g.history[end][2]) # history ist nichtleer, denn cut ist immer min. zweiter Spieler
+                else
+                    T.edges = [edge for edge in T.edges if edge.id != last_move_id]
+                    push!(T.edges, next_move)
+                end
+                return next_move
+            end
+        else
+            return random(valid_moves(g))
+        end
+    end
+end
