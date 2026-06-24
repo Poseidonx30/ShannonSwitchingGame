@@ -124,18 +124,16 @@ function who_can_win(g::GameState)
     end
     g.A = T1_edges
     g.B = T2_edges
-    if e1 ∈ T2_edges #|| e2 ∈ T1_edges #Cut hat Strategie
-        if e1 ∈ T1_edges
-            g.has_winning_strategy = :short
-            println("neutral?")
-        else
-            println("cut")
-            g.has_winning_strategy = :cut
-        end 
+    if e1 ∈ T2_edges || e2 ∈ T1_edges #Cut hat Strategie
+        println("cut")
+        g.has_winning_strategy = :cut
+    elseif e1 ∈ T1_edges # der erste Spieler, also short hat eine Strategie
+        g.has_winning_strategy = :short
+        println("erster Spieler gewinnt")
     else
         println("short")
         g.has_winning_strategy = :short
-    end 
+    end
 end
 
 function chase(g::GameState)

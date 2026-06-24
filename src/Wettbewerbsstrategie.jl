@@ -1,9 +1,9 @@
 const TEAM_NAME::String = ""
 
-weighted_short(state::GameState)::Edge
+function weighted_short(state::GameState)::Edge
+    return
+end
 
-return
-
-weighted_cut(state::GameState)::Edge 
-
-return
+function weighted_cut(state::GameState)::Edge 
+    return
+end

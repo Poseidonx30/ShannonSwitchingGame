@@ -726,7 +726,7 @@ function run_gui()
         else
             rebuild_short_graph!(state)
         end
-
+        # TODO: die beiden Bäume für Chase aus dem Verlauf wiederherstellen
         return true
     end
 
