@@ -70,7 +70,7 @@ function who_can_win(g::GameState)
     T2_edges = Base.Set(T2.edges)
     Sehnen = collect(gemeinsame_Sehnen(g.graph, T1_edges, T2_edges))
     e1 = Edge(-1, g.graph.s, g.graph.t, 0.0, :neutral)
-    e2 = Edge(-1, g.graph.s, g.graph.t, 0.0, :neutral)
+    e2 = Edge(-2, g.graph.s, g.graph.t, 0.0, :neutral)
     g.e1 = e1
     push!(Sehnen, e1, e2)
     i = 0
