@@ -81,8 +81,7 @@ function who_can_win(g::GameState)
         push!(Layers, Base.Set([b]))
         parent = Dict{Edge, Edge}()
         k=0
-        Augment = false
-        while !Augment
+        while true
             k += 1
             T = (k % 2 == 1) ? T1_edges : T2_edges
             T_next = (k % 2 == 1) ? T2_edges : T1_edges
@@ -90,20 +89,20 @@ function who_can_win(g::GameState)
             for elem ∈ Layers[k]
                 fc = FC(elem, T)
                 for elem2 ∈ fc
-                    parent[elem2] = elem
+                    if !haskey(parent, elem2)
+                        parent[elem2] = elem
+                    end
                 end
                 new_set = Base.union(new_set, fc)
             end  
             push!(Layers, new_set)
             if k == 1
                 if isempty(Layers[k+1]) 
-                    Augment = true #sollte eigentliche nicht passieren 
                     break
                 end
                 S = intersect(Layers[k+1], T_next)
             else 
                 if issetequal(Layers[k+1], Layers[k-1])
-                    Augment = true
                     break
                 end  
                 S = intersect(setdiff(Layers[k+1], Layers[k-1]), T_next)
@@ -120,7 +119,7 @@ function who_can_win(g::GameState)
                 k -= 1
                 T = (k % 2 == 1) ? T1_edges : T2_edges
             end 
-            Augment = true
+            break 
         end
     end
     g.A = T1_edges
@@ -148,28 +147,31 @@ function chase(g::GameState)
         end 
         T1_has_move = (last_move ∈ g.A)
         T2_has_move = (last_move ∈ g.B)
-        if (T1_has_move && T2_has_move) || (!T1_has_move && !T2_has_move)
-            return rand(valid_moves(g)) # Invariante bleibt erhalten
-        else
-            T = T1_has_move ? g.A : g.B
-            T_strich = T2_has_move ? g.A : g.B
-            next_move = nothing
-            for move in intersect(Base.Set(valid_moves(g)), FC(last_move, T_strich))
-                if last_move ∈ FC(move, T) 
-                    next_move = move 
-                    break
-                end
+        if (T1_has_move && T2_has_move) || (!T1_has_move && !T2_has_move) || last_move ∈ g.imaginary_moves
+            last_move = rand(symdiff(g.A, g.B))
+            push!(g.imaginary_moves, last_move)
+            T1_has_move = (last_move ∈ g.A)
+            T2_has_move = !T1_has_move
+        end 
+        T = T1_has_move ? g.A : g.B
+        T_strich = T2_has_move ? g.A : g.B
+        next_move = nothing
+        for move in intersect(Base.Set(valid_moves(g)), FC(last_move, T_strich))
+            if last_move ∈ FC(move, T) 
+                next_move = move 
+                break
             end
-            if next_move === nothing
-                return rand(valid_moves(g))
-            end
-            T = (g.current_player == :cut) ? T_strich : T
-            cut_move = (g.current_player == :cut) ? next_move : last_move
-            short_move = (g.current_player == :cut) ? last_move : next_move
-            delete!(T, cut_move)
-            push!(T, short_move)
-            return next_move
         end
+        if next_move === nothing
+            println("das sollte nicht passieren")
+            return rand(valid_moves(g))
+        end
+        T = (g.current_player == :cut) ? T_strich : T
+        cut_move = (g.current_player == :cut) ? next_move : last_move
+        short_move = (g.current_player == :cut) ? last_move : next_move
+        delete!(T, cut_move)
+        push!(T, short_move)
+        return next_move
     else
         return rand(valid_moves(g))
     end 
