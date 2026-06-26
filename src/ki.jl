@@ -162,9 +162,6 @@ function chase(g::GameState)
         end
         if next_move === nothing
             println("das sollte nicht passieren")
-            push!(g.A_history, g.A)
-            push!(g.B_history, g.B)
-            push!(g.imaginary_moves_history, g.imaginary_moves)
             return rand(valid_moves(g))
         end
         T = (g.current_player == :cut) ? T_strich : T
