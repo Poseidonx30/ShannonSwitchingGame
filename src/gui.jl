@@ -725,8 +725,7 @@ function run_gui()
             sort!(state.graph.edges, by = edge -> edge.id)
         else
             rebuild_short_graph!(state)
-        end
-        # TODO: die beiden Bäume für Chase aus dem Verlauf wiederherstellen
+        end        
         return true
     end
 
@@ -759,7 +758,6 @@ function run_gui()
             end
             return true
         end
-
         return undo_move!(state)
     end
 

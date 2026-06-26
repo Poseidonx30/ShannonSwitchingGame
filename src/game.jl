@@ -22,8 +22,6 @@ mutable struct GameState
     short_Graph::GameGraph
     A::Base.Set{Edge} 
     B::Base.Set{Edge} 
-    A_history::Vector{Base.Set{Edge}}
-    B_history::Vector{Base.Set{Edge}}
     e1::Edge
     has_winning_strategy::Symbol
     current_player::Symbol
@@ -81,7 +79,7 @@ function new_game(g::GameGraph)::GameState
     short_Graph = GameGraph([g.s, g.t], Vector{Edge}(), g.s, g.t)
     A = Base.Set{Edge}()
     B = Base.Set{Edge}()
-    return GameState(g, short_Graph, A, B, Vector{Base.Set{Edge}}(), Vector{Base.Set{Edge}}(), Edge(0, g.s, g.t, 0.0, :neutral),:neutral, :short, Vector{Tuple{Symbol, Edge}}(), Base.Set{Edge}(), nothing)
+    return GameState(g, short_Graph, A, B, Edge(0, g.s, g.t, 0.0, :neutral),:neutral, :short, Vector{Tuple{Symbol, Edge}}(), Base.Set{Edge}(), nothing)
 end
 
 function valid_moves(state::GameState)::Vector{Edge}

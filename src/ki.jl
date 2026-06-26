@@ -34,7 +34,7 @@ function FC(Sehne::Edge, Spannbaum::Base.Set{Edge})::Base.Set{Edge}
                 pop!(cumulated_Edges) # Die hinführende Kante entfernen
             end
         end
-    end    
+    end   
     return Base.Set(cumulated_Edges)
 end
 
@@ -124,13 +124,13 @@ function who_can_win(g::GameState)
     end
     g.A = T1_edges
     g.B = T2_edges
-    if e1 ∈ T2_edges || e2 ∈ T1_edges #Cut hat Strategie
+    if e1 ∈ T1_edges
+        println("short")
+        g.has_winning_strategy = :short
+    elseif e1 ∈ T2_edges || e2 ∈ T1_edges
         println("cut")
         g.has_winning_strategy = :cut
-    elseif e1 ∈ T1_edges # der erste Spieler, also short hat eine Strategie
-        g.has_winning_strategy = :short
-        println("erster Spieler gewinnt")
-    else
+    else 
         println("short")
         g.has_winning_strategy = :short
     end
@@ -162,6 +162,9 @@ function chase(g::GameState)
         end
         if next_move === nothing
             println("das sollte nicht passieren")
+            push!(g.A_history, g.A)
+            push!(g.B_history, g.B)
+            push!(g.imaginary_moves_history, g.imaginary_moves)
             return rand(valid_moves(g))
         end
         T = (g.current_player == :cut) ? T_strich : T
@@ -172,5 +175,5 @@ function chase(g::GameState)
         return next_move
     else
         return rand(valid_moves(g))
-    end 
-end 
+    end
+end
