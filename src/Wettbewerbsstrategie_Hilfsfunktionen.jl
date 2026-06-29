@@ -37,6 +37,7 @@ mutable struct ExtendedGameState
     A::Base.Set{Edge} 
     B::Base.Set{Edge} 
     e1::Edge
+    e2::Edge
     has_winning_strategy::Symbol
     current_player::Symbol
     first_optimal_move::Bool 
@@ -178,7 +179,7 @@ function who_can_win(g::ExtendedGameState, minimal::Bool)
         Sehnen = collect(gemeinsame_Sehnen(g.merged_graph, T1_edges))
     end 
     e1 = g.e1
-    e2 = Edge(-2, g.merged_graph.s, g.merged_graph.t, 0.0, :neutral)  #ich hoffe im Wettbewerb gibt es keine Kanten mit Gewichten inf und -inf...
+    e2 = g.e2  #ich hoffe im Wettbewerb gibt es keine Kanten mit Gewichten -1, -2; sonst ändern
     push!(Sehnen, e1, e2)
     i = 0
     while i < length(Sehnen) && !isempty(intersect(T1_edges, T2_edges))   #length(Sehnen) = j + 2 
@@ -231,7 +232,7 @@ function who_can_win(g::ExtendedGameState, minimal::Bool)
     end
     g.A = T1_edges
     g.B = T2_edges
-    if e1 ∈ T2_edges || e2 ∈ T1_edges
+    if e1 ∈ T2_edges || e2 ∈ T1_edges || e1 ∈ T1_edges
         println("cut")
         g.has_winning_strategy = :cut
     else 
@@ -241,38 +242,35 @@ function who_can_win(g::ExtendedGameState, minimal::Bool)
 end
 
 function chase(g::ExtendedGameState, state::GameState)::Edge
-    println(g.A)
-    println()
-    println(g.B)
-    println()
+    skip = false
     if g.first_optimal_move == true 
         if g.e1 ∈ g.A 
             last_move = g.e1  
         else 
-            last_move = rand(symdiff(g.A, g.B)) #wie unten
+            last_move = rand(setdiff(symdiff(g.A, g.B), [g.e1, g.e2])) #wie unten
             push!(g.imaginary_moves, last_move)
+            skip = true 
         end 
-        g.first_optimal_move == false
+        g.first_optimal_move = false
     else
         last_move = state.history[end][2]
     end 
     T1_has_move = (last_move ∈ g.A)
     T2_has_move = (last_move ∈ g.B)
-    if (T1_has_move && T2_has_move) || (!T1_has_move && !T2_has_move) || last_move ∈ g.imaginary_moves || get_component!(g.merged_graph.components, last_move.u.id) == get_component!(g.merged_graph.components, g.merged_graph.s.id)
-        last_move = rand(symdiff(g.A, g.B))   #nicht optimal für Short. Man sollte wahrscheinlich einen Zug wählen, auf den die Antwort möglichst günstig ist.
-        #Auf alle möglichen zufälligen Züge aus der sym.diff. die Antwort zu berechnen (ggf. zusammen mit MCTS) dauert vlt. aber zu lang
-        push!(g.imaginary_moves, last_move)
+    if (T1_has_move && T2_has_move) || (!T1_has_move && !T2_has_move) || last_move ∈ g.imaginary_moves || get_component!(g.merged_graph.components, last_move.u.id) == get_component!(g.merged_graph.components, last_move.v.id)
+        if !skip 
+            last_move = rand(setdiff(symdiff(g.A, g.B), [g.e1, g.e2]))   #nicht optimal für Short. Man sollte wahrscheinlich einen Zug wählen, auf den die Antwort möglichst günstig ist.
+            #Auf alle möglichen zufälligen Züge aus der sym.diff. die Antwort zu berechnen (ggf. zusammen mit MCTS) dauert vlt. aber zu lang
+            push!(g.imaginary_moves, last_move)
+        end 
         T1_has_move = (last_move ∈ g.A)
         T2_has_move = !T1_has_move
     end 
-    println(last_move)
     T = T1_has_move ? g.A : g.B
     T_strich = T2_has_move ? g.A : g.B
     if state.current_player == :cut 
         next_move = nothing 
-        println(intersect(Base.Set(valid_moves(state)), FC(last_move, T_strich, g.merged_graph.components)))
         for move in intersect(Base.Set(valid_moves(state)), FC(last_move, T_strich, g.merged_graph.components))
-            println(intersect(Base.Set(valid_moves(state)), FC(last_move, T_strich, g.merged_graph.components)))
             if last_move ∈ FC(move, T, g.merged_graph.components) 
                 next_move = move 
                 break  

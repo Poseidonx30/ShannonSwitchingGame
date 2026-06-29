@@ -12,9 +12,10 @@ const EXTENDED_STATE = Ref{Union{Nothing, ExtendedGameState}}(nothing)
 function weighted_cut(state::GameState)::Edge 
     if length(state.history) == 1 #Initialisieren vom Extended State
         e1 = Edge(-1, state.graph.s, state.graph.t, 0.0, :neutral)
+        e2 = Edge(-2, state.graph.s, state.graph.t, 0.0, :neutral)
         graph = EfficientGameGraph(Base.Set(state.graph.edges), ComponentTracker(Vector{Int}(), Vector{Int}(), Dict{Int, Int}(), Vector{Int}()), state.graph.s, state.graph.t) 
         merged_graph = EfficientGameGraph(Base.Set(state.graph.edges), ComponentTracker([v.id for v in state.graph.vertices]), state.graph.s, state.graph.t) 
-        EXTENDED_STATE[] = ExtendedGameState(graph, merged_graph, Base.Set{Edge}(), Base.Set{Edge}(), e1, :neutral, :cut, false, Base.Set{Edge}(), nothing)
+        EXTENDED_STATE[] = ExtendedGameState(graph, merged_graph, Base.Set{Edge}(), Base.Set{Edge}(), e1, e2, :neutral, :cut, false, Base.Set{Edge}(), nothing)
     end 
     if EXTENDED_STATE[].winner != :cut  #noch nicht gewonnen (im aktuellen merged graph, nicht allgemein)
         EXTENDED_STATE[].winner = (check_st_connection(EXTENDED_STATE[].merged_graph) == false) ? :cut : nothing
