@@ -111,7 +111,45 @@ function weighted_cut(state::GameState)::Edge
 end
 
 function MCTS(state::GameState; Zeitlimit = 1.0)
-     
+    
 end 
 
+mutable struct MCTS_node
+    parent::Union{MCTS_node,Nothing}
+    children::Union{Base.Set{MCTS_node,Nothing}}
+    wins::Int
+    visits::Int
+    untried_actions::Set{Edge}
+    terminal::Bool
+end
 
+function select(node::MCTS_node)::MCTS_node
+    current_node = node
+    # möglicherweise noch nicht besuchte Kinder bevorzugen
+    while !isnothing(current_node.children)
+        ucb = -∞
+        max_child = nothing
+        found_node = false
+        for child in current_node.children
+            if child.visits == 0
+                current_node = child
+                found_node = true
+                break
+            elseif child.wins/child.visits + sqrt(2) * sqrt(log(current_node.visits)/child.visits) > ucb # child.visits ≠ 0
+                max_child = child
+            end
+        end
+        if !found_node
+            current_node = max_child
+        end
+    end
+    return current_node
+end
+
+@inline function backpropagate!(node::MCTS_node, reward::Int)
+    while !isnothing(node.parent) # wird immer mit mindestens Kindknoten von root aufgerufen
+        node.reward += reward
+        node.visits += 1
+        node = node.parent
+    end
+end
