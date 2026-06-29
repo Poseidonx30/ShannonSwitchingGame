@@ -1,8 +1,13 @@
 const TEAM_NAME::String = "StockFisch 1.0"
 
+Base.isequal(E1::Edge, E2::Edge) = E1.id == E2.id # es gibt nicht zwei gleiche Kanten mit unterschiedlicher ID
+Base.hash(E::Edge, h::UInt) = hash(E.id, h)
+
+Base.hash(v::Vertex, h::UInt) = hash(v.id, h)
+Base.isequal(v1::Vertex, v2::Vertex) = v1.id == v2.id
+
 mutable struct ExtendedGameState
     graph::EfficientGameGraph
-    short_graph::EfficientGameGraph
     merged_graph::EfficientGameGraph
     A::Base.Set{Edge} 
     B::Base.Set{Edge} 
@@ -16,90 +21,27 @@ end
 
 mutable struct EfficientGameGraph
     edges::Base.Set{Edge}  
-    zusammenhangskomponenten::Dict{Vertex,customSet}() #zum Effizienten Umgang mit merged_graph
+    components::ComponentTracker      #Short fügt hierin zusammen
     s::Vertex                 
     t::Vertex                 
 end
 
-mutable struct Element
-    value::Vertex
-    parent::Any
-    s::Union{Element,Nothing}
+struct ComponentTracker   #Für effizientes Tracken von Zusammenhangskomponenten (hat Gemini in dieser Art vorgeschlagen - ist wohl etwas effizienter als unsere alte Struktur)
+    parent::Vector{Int}
+    size::Vector{Int}
 end
 
-mutable struct customSet
-    head::Element
-    tail::Element
-    size::Int
-end
-
-function make_set(elem::Element)::customSet
-    newSet = customSet(elem, elem, 1)
-    elem.parent = newSet
-    return newSet
-end
-
-function find_set(elem::Element)::customSet
-    return elem.parent
-end
-
-
-function union!(elem1::Element, elem2::Element)::Element
-    if elem1.parent.size < elem2.parent.size # hänge Liste2 an Liste1, falls Liste2 länger ist, vertausche die Listen
-        temp = elem1
-        elem1 = elem2
-        elem2 = temp
-    end
-    parent2 = elem2.parent
-    elem1.parent.size += parent2.size
-    elem1.parent.tail.s = parent2.head
-    if !isnothing(parent2.tail.s)
-        nothing
-    end
-    currentElement = parent2.head
-    while !isnothing(currentElement)
-        if isnothing(currentElement.s)
-            elem1.parent.tail = currentElement
-        end
-        currentElement.parent = elem1.parent
-        currentElement = currentElement.s
-    end
-    return parent2.head
-end
+Base.copy(ct::ComponentTracker) = ComponentTracker(copy(ct.parent), copy(ct.size))
 
 const EXTENDED_STATE = Ref{Union{Nothing, ExtendedGameState}}(nothing)
 
-function check_st_connection(G::EfficientGameGraph)::Bool #Adaption von kruskal über union find
-    sets = copy(Dict{Vertex,customSet}())
-    for e in G.edges
-        if sets[G.t] == sets[G.s]
-            return true
-        end 
-        if sets[e.u] !== sets[e.v]
-           deletedSet = union!(sets[e.u].tail, sets[e.v].head)
-           delete!(sets, deletedSet.value)
-        end 
-    end 
-    return false
-end 
-
-function merge_graph!(e::Edge)
-    
-end
-
-function weighted_short(state::GameState)::Edge
-
-end
 
 function weighted_cut(state::GameState)::Edge 
-    if length(state.history) == 1
-        graph = EfficientGameGraph(Base.Set(state.graph.edges), Base.Set{customSet}(), state.graph.s, state.graph.t) 
-        short_graph = EfficientGameGraph(Base.Set(history[end][2]), Base.Set{customSet}(), state.graph.s, state.graph.t)
-        merged_graph = EfficientGameGraph(Base.Set(state.graph.edges), Base.Set{customSet}([make_set(Element(v, nothing, nothing)) for v in state.graph.vertices]), state.graph.s, state.graph.t) #anpassen für Dict
-        A = Base.Set{Edge}()
-        B = Base.Set{Edge}()
+    if length(state.history) == 1 #Initialisieren vom Extended State
         e1 = Edge(Inf, state.graph.s, state.graph.t)
-        EXTENDED_STATE[] = ExtendedGameState(graph, short_graph, merged_graph, Base.Set{Edge}(), Base.Set{Edge}(), e1, :neutral, :cut, copy(state.history), Base.Set{Edge}(), nothing)
+        graph = EfficientGameGraph(Base.Set(state.graph.edges), ComponentTracker(Vector{Int}(), Vector{Int}()), state.graph.s, state.graph.t) 
+        merged_graph = EfficientGameGraph(Base.Set(state.graph.edges), ComponentTracker([v.id for v in state.vertices], ones(Int, length(state.vertices))), state.graph.s, state.graph.t) 
+        EXTENDED_STATE[] = ExtendedGameState(graph, merged_graph, Base.Set{Edge}(), Base.Set{Edge}(), e1, :neutral, :cut, copy(state.history), Base.Set{Edge}(), nothing)
     end 
     if EXTENDED_STATE[].winner != :cut  #noch nicht gewonnen (im aktuellen merged graph, nicht allgemein)
         EXTENDED_STATE[].winner = (check_st_connection(merged_graph) == false) ? :cut : nothing
@@ -107,11 +49,42 @@ function weighted_cut(state::GameState)::Edge
     if EXTENDED_STATE[].winner == :cut  #schon gewonnen (im aktuellen merged graph sind s und t nicht mehr verbunden)
         return rand(valid_moves(state))
     end 
-    merge_graph!(state.history[end][2])  #neue Zusammenhangskomponenten setzen
+
+    if state.has_winning_strategy == :cut
+        return chase(state)
+    else 
+        shorts_edge = state.history[end][2]
+        merged_graph = EXTENDED_STATE[].merged_graph
+        if !(get_component!(merged_graph.components, shorts_edge.u.id) == get_component!(merged_graph.components, merged_graph.s) && get_component!(merged_graph.components, shorts_edge.v.id) == get_component!(merged_graph.components, merged_graph.t) 
+            || get_component!(merged_graph.components, shorts_edge.v.id) == get_component!(merged_graph.components, merged_graph.s) && get_component!(merged_graph.components, shorts_edge.u.id) == get_component!(merged_graph.components, merged_graph.t))
+            merge_graph!(merged_graph.components, shorts_edge)  #neue Zusammenhangskomponenten setzen; s und t sollen nicht in einem Zshk. kommen
+        end 
+        delete!(merged_graph.edges, shorts_edge)
+        if who_can_win(merged_graph, false) == :cut  #false, da für cut Gewichtung nicht interessant, falls optimale Strategie existiert (sofern Strafe für short hoch genug - hoffe ich mal)
+            return chase(state)
+        else
+            return #MCTS
+        end 
+    end 
 end
 
+<<<<<<< HEAD
 function MCTS(state::GameState; Zeitlimit = 1.0)
     
+=======
+
+
+function weighted_short(state::GameState)::Edge
+#= Hier gibt es verschiedene Möglichkeiten. Wir könnten nur MCTS verwenden. Ein Vorschlag von Gemini (der für mich ganz gut klingt), wäre MCTS zu verwenden, 
+falls es keine optimale Strategie gibt (klar). Und im Fall einer optimalen Strategie,
+MCTS anzuwenden auf die möglichen optimalen Antwort-Kanten, um nicht nur lokal das günstigste zu wählen, sondern auch in die Zukunft zu schauen. Die optimale Strategie ist aber auch nicht ganz so einfach übertragbar.
+Ich habe es jetzt so angepasst, dass Krukal auch einen minimalen Spannbaum berechnen kann und die Sehnen ihrem Gewicht nach geordnet zum Augmentieren probiert werden (falls true übergeben wird für minimal).
+Vlt. ist aber auch ein reiner guter MCTS Alg. besser. (siehe auch chase Alg in den Hilfsfunktionen) =#
+end
+
+function MCTS(state::GameState; Zeitlimit = 1.0)::Edge
+     
+>>>>>>> eff90ce7ec3caab78e9543c7f2753dace8861651
 end 
 
 mutable struct MCTS_node
