@@ -775,7 +775,11 @@ function run_gui()
     function computer_move!()
         state = current_game_state[]
         (state === nothing || state.winner !== nothing || !is_computer_turn(state)) && return
-        edge = chase(state)
+        if state.current_player == :cut
+            edge = weighted_cut(state)
+        else 
+            edge = rand(valid_moves(state))
+        end 
         edge === nothing && return
         make_move!(state, edge)
         refresh!()
@@ -1053,9 +1057,6 @@ function run_gui()
         cut_player_name[] = cut_name
         current_graph[] = graph
         current_game_state[] = new_game(graph)
-        if is_computer_game()
-            who_can_win(current_game_state[]) 
-        end
         refresh!()
         computer_move!()
     end

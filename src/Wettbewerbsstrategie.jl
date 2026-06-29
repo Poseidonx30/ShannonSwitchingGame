@@ -6,97 +6,76 @@ Base.hash(E::Edge, h::UInt) = hash(E.id, h)
 Base.hash(v::Vertex, h::UInt) = hash(v.id, h)
 Base.isequal(v1::Vertex, v2::Vertex) = v1.id == v2.id
 
-mutable struct ExtendedGameState
-    graph::EfficientGameGraph
-    merged_graph::EfficientGameGraph
-    A::Base.Set{Edge} 
-    B::Base.Set{Edge} 
-    e1::Edge
-    has_winning_strategy::Symbol
-    current_player::Symbol
-    history::Vector{Tuple{Symbol, Edge}} 
-    imaginary_moves::Base.Set{Edge}
-    winner::Union{Symbol, Nothing}
-end
-
-mutable struct EfficientGameGraph
-    edges::Base.Set{Edge}  
-    components::ComponentTracker      #Short fügt hierin zusammen
-    s::Vertex                 
-    t::Vertex                 
-end
-
-struct ComponentTracker   #Für effizientes Tracken von Zusammenhangskomponenten (hat Gemini in dieser Art vorgeschlagen - ist wohl etwas effizienter als unsere alte Struktur)
-    parent::Vector{Int}
-    size::Vector{Int}
-end
-
-Base.copy(ct::ComponentTracker) = ComponentTracker(copy(ct.parent), copy(ct.size))
-
 const EXTENDED_STATE = Ref{Union{Nothing, ExtendedGameState}}(nothing)
 
 
 function weighted_cut(state::GameState)::Edge 
     if length(state.history) == 1 #Initialisieren vom Extended State
-        e1 = Edge(Inf, state.graph.s, state.graph.t)
-        graph = EfficientGameGraph(Base.Set(state.graph.edges), ComponentTracker(Vector{Int}(), Vector{Int}()), state.graph.s, state.graph.t) 
-        merged_graph = EfficientGameGraph(Base.Set(state.graph.edges), ComponentTracker([v.id for v in state.vertices], ones(Int, length(state.vertices))), state.graph.s, state.graph.t) 
-        EXTENDED_STATE[] = ExtendedGameState(graph, merged_graph, Base.Set{Edge}(), Base.Set{Edge}(), e1, :neutral, :cut, copy(state.history), Base.Set{Edge}(), nothing)
+        e1 = Edge(-1, state.graph.s, state.graph.t, 0.0, :neutral)
+        graph = EfficientGameGraph(Base.Set(state.graph.edges), ComponentTracker(Vector{Int}(), Vector{Int}(), Dict{Int, Int}(), Vector{Int}()), state.graph.s, state.graph.t) 
+        merged_graph = EfficientGameGraph(Base.Set(state.graph.edges), ComponentTracker([v.id for v in state.graph.vertices]), state.graph.s, state.graph.t) 
+        EXTENDED_STATE[] = ExtendedGameState(graph, merged_graph, Base.Set{Edge}(), Base.Set{Edge}(), e1, :neutral, :cut, false, Base.Set{Edge}(), nothing)
     end 
     if EXTENDED_STATE[].winner != :cut  #noch nicht gewonnen (im aktuellen merged graph, nicht allgemein)
-        EXTENDED_STATE[].winner = (check_st_connection(merged_graph) == false) ? :cut : nothing
+        EXTENDED_STATE[].winner = (check_st_connection(EXTENDED_STATE[].merged_graph) == false) ? :cut : nothing
     end
     if EXTENDED_STATE[].winner == :cut  #schon gewonnen (im aktuellen merged graph sind s und t nicht mehr verbunden)
         return rand(valid_moves(state))
     end 
 
-    if state.has_winning_strategy == :cut
-        return chase(state)
+    if EXTENDED_STATE[].has_winning_strategy == :cut
+        return chase(EXTENDED_STATE[], state)
     else 
         shorts_edge = state.history[end][2]
         merged_graph = EXTENDED_STATE[].merged_graph
-        if !(get_component!(merged_graph.components, shorts_edge.u.id) == get_component!(merged_graph.components, merged_graph.s) && get_component!(merged_graph.components, shorts_edge.v.id) == get_component!(merged_graph.components, merged_graph.t) 
-            || get_component!(merged_graph.components, shorts_edge.v.id) == get_component!(merged_graph.components, merged_graph.s) && get_component!(merged_graph.components, shorts_edge.u.id) == get_component!(merged_graph.components, merged_graph.t))
-            merge_graph!(merged_graph.components, shorts_edge)  #neue Zusammenhangskomponenten setzen; s und t sollen nicht in einem Zshk. kommen
+        if !(get_component!(merged_graph.components, shorts_edge.u.id) == get_component!(merged_graph.components, merged_graph.s.id) && get_component!(merged_graph.components, shorts_edge.v.id) == get_component!(merged_graph.components, merged_graph.t.id) 
+            || get_component!(merged_graph.components, shorts_edge.v.id) == get_component!(merged_graph.components, merged_graph.s.id) && get_component!(merged_graph.components, shorts_edge.u.id) == get_component!(merged_graph.components, merged_graph.t.id))
+            merge_components!(merged_graph.components, shorts_edge.u.id, shorts_edge.v.id)  #neue Zusammenhangskomponenten setzen; s und t sollen nicht in einem Zshk. kommen
         end 
         delete!(merged_graph.edges, shorts_edge)
-        if who_can_win(merged_graph, false) == :cut  #false, da für cut Gewichtung nicht interessant, falls optimale Strategie existiert (sofern Strafe für short hoch genug - hoffe ich mal)
-            return chase(state)
+        who_can_win(EXTENDED_STATE[], false)
+        if EXTENDED_STATE[].has_winning_strategy == :cut  #false, da für cut Gewichtung nicht interessant, falls optimale Strategie existiert (sofern Strafe für short hoch genug - hoffe ich mal)
+            EXTENDED_STATE[].first_optimal_move = true 
+            return chase(EXTENDED_STATE[], state)
         else
-            return #MCTS
+            println("hallo")
+            cuts_edge = rand(valid_moves(state)) #MCTS
+            delete!(EXTENDED_STATE[].merged_graph.edges, cuts_edge)
+            return cuts_edge
         end 
     end 
 end
 
-<<<<<<< HEAD
-function MCTS(state::GameState; Zeitlimit = 1.0)
-    
-=======
+#= mutable struct MCTS_node
+    parent::Union{MCTS_node,Nothing}
+    children::Base.Set{MCTS_node}
+    total_weight_at_end::Int
+    visits::Int
+    untried_actions::Vector{Edge}
+    terminal::Bool
+end =#
 
-
-function weighted_short(state::GameState)::Edge
-#= Hier gibt es verschiedene Möglichkeiten. Wir könnten nur MCTS verwenden. Ein Vorschlag von Gemini (der für mich ganz gut klingt), wäre MCTS zu verwenden, 
-falls es keine optimale Strategie gibt (klar). Und im Fall einer optimalen Strategie,
-MCTS anzuwenden auf die möglichen optimalen Antwort-Kanten, um nicht nur lokal das günstigste zu wählen, sondern auch in die Zukunft zu schauen. Die optimale Strategie ist aber auch nicht ganz so einfach übertragbar.
-Ich habe es jetzt so angepasst, dass Krukal auch einen minimalen Spannbaum berechnen kann und die Sehnen ihrem Gewicht nach geordnet zum Augmentieren probiert werden (falls true übergeben wird für minimal).
-Vlt. ist aber auch ein reiner guter MCTS Alg. besser. (siehe auch chase Alg in den Hilfsfunktionen) =#
-end
-
-function MCTS(state::GameState; Zeitlimit = 1.0)::Edge
-     
->>>>>>> eff90ce7ec3caab78e9543c7f2753dace8861651
+#= function MCTS(state::GameState; time_limit = 1.0)::Union{Nothing,Edge}
+    try
+        @async begin # nach Ablauf von time_limit wird ein error geworfen
+            sleep(time_limit)
+            throw(InterruptException())
+        end
+        if !isnothing(state.winner)
+            return nothing
+        end
+        untried_actions = valid_moves(state)
+        root_node = MCTS_node(nothing, Base.Set(), 0.0, 0, untried_actions, false)
+        while true
+            expand(select(root_node))
+    catch e
+        if !isa(e, InterruptException)
+            println("Nicht geplantes Verhalten")
+        end
+    end
 end 
 
-mutable struct MCTS_node
-    parent::Union{MCTS_node,Nothing}
-    children::Union{Base.Set{MCTS_node,Nothing}}
-    wins::Int
-    visits::Int
-    untried_actions::Set{Edge}
-    terminal::Bool
-end
-
-function select(node::MCTS_node)::MCTS_node
+@inline function select(node::MCTS_node)::MCTS_node
     current_node = node
     # möglicherweise noch nicht besuchte Kinder bevorzugen
     while !isnothing(current_node.children)
@@ -108,8 +87,9 @@ function select(node::MCTS_node)::MCTS_node
                 current_node = child
                 found_node = true
                 break
-            elseif child.wins/child.visits + sqrt(2) * sqrt(log(current_node.visits)/child.visits) > ucb # child.visits ≠ 0
+            elseif -(child.total_weight_at_end/child.visits + sqrt(2) * sqrt(log(current_node.visits)/child.visits)) > ucb # child.visits ≠ 0
                 max_child = child
+                ucb = -(child.total_weight_at_end/child.visits + sqrt(2) * sqrt(log(current_node.visits)/child.visits))
             end
         end
         if !found_node
@@ -119,10 +99,17 @@ function select(node::MCTS_node)::MCTS_node
     return current_node
 end
 
-@inline function backpropagate!(node::MCTS_node, reward::Int)
+@inline function expand(node::MCTS_node)::MCTS_node
+    random_move = popat!(node.untried_actions, floor(rand()*length(node.untried_actions)))
+    is_terminal = isempty(node.untried_actions)
+    if is_terminal
+        
+    push!(node.children, MCTS_node(node, Base.Set(), 0.0, 0, node.untried_actions, isempty(node.untried_actions)))
+
+@inline function backpropagate!(node::MCTS_node, weight_at_end::Int)
     while !isnothing(node.parent) # wird immer mit mindestens Kindknoten von root aufgerufen
-        node.reward += reward
+        node.total_weight_at_end += weight_at_end
         node.visits += 1
         node = node.parent
     end
-end
+end =#
