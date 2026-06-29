@@ -306,7 +306,7 @@ end
 mutable struct MinHeap
     elements::Vector{Tuple{Int,Float64}}
     size::Int
-    MinHeap() = new([],0)
+    position::Dict{Int,Int} # speichert zu gegebener Knoten-ID die Position in elements ab
 end
 
 function min_heapify!(A::MinHeap, i::Int)
@@ -326,10 +326,12 @@ function min_heapify!(A::MinHeap, i::Int)
             temp = A.elements[i]
             A.elements[i] = A.elements[l]
             A.elements[l] = temp
+            A.position[A.elements[l][1]], A.position[A.elements[i][1]] = A.position[A.elements[i][1]], A.position[A.elements[l][1]]
         else
             temp = A.elements[i]
             A.elements[i] = A.elements[r]
             A.elements[r] = temp
+            A.position[A.elements[r][1]], A.position[A.elements[i][1]] = A.position[A.elements[i][1]], A.position[A.elements[r][1]]
         end
         return min_heapify!(A, smallest)
     end
@@ -338,6 +340,7 @@ end
 
 function extract_min!(A::MinHeap)
     A.elements[1], A.elements[A.size] = A.elements[A.size], A.elements[1]
+    A.position[A.elements[1][1]], A.position[A.elements[A.size][1]] = A.position[A.elements[A.size][1]], A.position[A.elements[1][1]]
     A.size -= 1
     min_heapify!(A,1)
     return A.elements[A.size+1]
@@ -347,43 +350,50 @@ function decrease_key!(A::MinHeap,i::Int,k::Float64)
     A.elements[i] = (A.elements[i][1],k)
     while i > 1 && A.elements[i ÷ 2][2] > A.elements[i][2]
         A.elements[i], A.elements[i÷2] = A.elements[i÷2], A.elements[i]
+        A.position[A.elements[i][1]], A.position[A.elements[i÷2][1]] = A.position[A.elements[i÷2][1]], A.position[A.elements[i][1]]
         i = i÷2
     end
 end
 
-function insert!(A::MinHeap, val::Tuple{Int,Float64})
-    A.size += 1
-    if length(A.elements) >= A.size
-        A.elements[A.size] = (val[1],Inf)
-    else
-        push!(A.elements, (val[1],Inf))
+function insert!(A::MinHeap, elems::Vector{Tuple{Int,Float64}})
+    sizehint!(A.position, length(elems))
+    for (id,weight) ∈ elems 
+        A.size += 1
+        if length(A.elements) >= A.size
+            A.elements[A.size] = (id,Inf)
+        else
+            push!(A.elements, (id,Inf))
+        end
+        A.position[id] = A.size
+        decrease_key!(A, A.size, weight)
     end
-    decrease_key!(A, A.size, val[2])
 end
 
-#=
-function dijkstra(g::GameGraph, s::Vertex, t::Vertex)
-    old_vertex_ids = [vertex.id for vertex ∈ g.vertices]
-    i=1
-    for vertex ∈ g.vertices
-        vertex.id = i
-        i+= 1
-    end
-    y = Dict{Vertex, Float64}() # speichert die Kosten, um zu einem Knoten zu kommen
-    heap = MinHeap()
+function dijkstra(g::GameGraph, s::Vertex, t::Vertex)::Float64 # gibt die Kosten eines minimalen s-t-Wegs zurück
+    heap = MinHeap([], 0, Dict())
+    result = 0.0
+    elems = Vector{Tuple{Int,Float64}}()
     for vertex ∈ g.vertices
         if vertex == s
-            insert!(heap, (vertex.id, 0))
-            y[w] = 0
+            push!(elems, (vertex.id, 0.0))
         else
-            insert!(heap, (vertex.id, Inf))
-            y[w] = Inf
+            push!(elems, (vertex.id, Inf))
         end
     end
-    while !isempty(heap.elements)
+    insert!(heap, elems)
+    while heap.size != 0
         v = extract_min!(heap)
+        if v[1] == t.id
+            result = v[2]
+            break
+        end
         for e ∈ g.edges
-            if e.u.id == v.id && y[w] > v[2] + e.weight
-                decrease_key!(heap,)
-=#
-
+            if e.u.id == v[1] && heap.elements[heap.position[e.v.id]][2] > v[2] + e.weight
+                decrease_key!(heap,heap.position[e.v.id],v[2] + e.weight)
+            elseif e.v.id == v[1] && heap.elements[heap.position[e.u.id]][2] > v[2] + e.weight
+                decrease_key!(heap,heap.position[e.u.id],v[2] + e.weight)
+            end
+        end
+    end
+    return result
+end

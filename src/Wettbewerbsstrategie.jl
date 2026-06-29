@@ -51,6 +51,9 @@ end
     children::Base.Set{MCTS_node}
     total_weight_at_end::Int
     visits::Int
+    graph::GameGraph
+    s::Node
+    t::Node
     untried_actions::Vector{Edge}
     terminal::Bool
 end =#
@@ -99,12 +102,16 @@ end
     return current_node
 end
 
-@inline function expand(node::MCTS_node)::MCTS_node
+@inline function expand(node::MCTS_node)::Union{Nothing,Float64}
     random_move = popat!(node.untried_actions, floor(rand()*length(node.untried_actions)))
     is_terminal = isempty(node.untried_actions)
     if is_terminal
-        
+        weight = dijkstra(node.graph, node.s, node.t)
+        return weight
+    end
     push!(node.children, MCTS_node(node, Base.Set(), 0.0, 0, node.untried_actions, isempty(node.untried_actions)))
+    return nothing
+end
 
 @inline function backpropagate!(node::MCTS_node, weight_at_end::Int)
     while !isnothing(node.parent) # wird immer mit mindestens Kindknoten von root aufgerufen
