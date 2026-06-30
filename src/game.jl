@@ -181,12 +181,8 @@ function random_graph(n::Int, m::Int; weighted=false)::Union{GameGraph, Nothing}
         return GameGraph(Knoten, Edges, s, t)
     else 
         graph = random_graph(n, m)
-        if isnothing(graph)
-            println("Fehler")
-            return nothing
-        end
         for edge in graph.edges
-            edge.weight = rand(Float64)*10
+            edge.weight = rand(-1000.0:1.0:1000.0)
         end
         return graph
     end
