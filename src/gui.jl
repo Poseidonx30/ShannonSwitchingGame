@@ -776,7 +776,9 @@ function run_gui()
         state = current_game_state[]
         (state === nothing || state.winner !== nothing || !is_computer_turn(state)) && return
         if state.current_player == :cut
+            t = time_ns()
             edge = weighted_cut(state)
+            println("on_move dauerte $((time_ns() - t)/1e6) ms")
         else 
             edge = rand(valid_moves(state))
         end 
