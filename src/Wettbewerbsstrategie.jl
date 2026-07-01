@@ -74,7 +74,7 @@ function weighted_short(state::GameState)::Edge
     return shorts_edge
 end
 
-#= mutable struct MCTS_node
+mutable struct MCTS_node
     parent::Union{MCTS_node,Nothing}
     children::Base.Set{MCTS_node}
     total_weight_at_end::Float64
@@ -89,37 +89,31 @@ end
 function MCTS(state::ExtendedGameState, orig_state::GameState; time_limit = 1.0)::Edge # state.graph muss die von short beanspruchten Kanten enthalten, WICHTIG: die Zusammenhangskomponenten von ComponentTracker müssen berichtigt werden, wenn der Anfangsgraph nicht-leer ist
     start_time = time()
     root_node = MCTS_node(nothing, Base.Set(), 0.0, 0, state.short_graph, state.merged_graph, :short, false, Base.Set(valid_moves(orig_state)))
+    avg_call_time = [] # nur für Tests
     while true
+        last_time = time_ns()
         if time() - start_time >= time_limit
-            println("Limit erreicht")
+            println("Limit erreicht, durchschnittliche Rechenzeit für ein Aufruf: ", sum(avg_call_time)/length(avg_call_time), " ms")
             break 
         end
         root_node.visits += 1
         node = select(root_node)
         if node.terminal
             backpropagate!(node, node.total_weight_at_end / node.visits)
+            continue
         end
-        new_node = expand!(node)
-        if new_node[2] != -1 # dann ist der expandierte Zustand ein Endzustand
-            println("weight: ", new_node[2])
-            backpropagate!(new_node[1], new_node[2])
+        node = expand!(node)
+        if node[2] != -1 # dann ist der expandierte Zustand ein Endzustand
+            backpropagate!(node[1], node[2])
+            continue
         end
-        node = simulate!(new_node[1])
-        println("weight: ", node[2])
+        node = simulate!(node[1])
         backpropagate!(node[1], node[2])
+
+        push!(avg_call_time, (time_ns() - last_time)/1e6)
     end
-    ucb = -Inf
-    max_child = nothing
-    for child in root_node.children
-        if root_node.current_player == :short && child.visits != 0 && -(child.total_weight_at_end/child.visits + sqrt(2) * sqrt(log(root_node.visits)/child.visits)) > ucb
-            max_child = child
-            ucb = -(child.total_weight_at_end/child.visits + sqrt(2) * sqrt(log(root_node.visits)/child.visits))
-        elseif root_node.current_player == :cut && child.visits != 0 && child.total_weight_at_end/child.visits + sqrt(2) * sqrt(log(root_node.visits)/child.visits) > ucb
-            max_child = child
-            ucb = child.total_weight_at_end/child.visits + sqrt(2) * sqrt(log(root_node.visits)/child.visits)
-        end
-    end
-    return setdiff(max_child.parent.short_graph.edges, max_child.short_graph.edges)
+    max_child = argmax(x -> x.visits, root_node.children)
+    return first(setdiff(max_child.short_graph.edges, root_node.short_graph.edges))
 end 
 
 @inline function select(node::MCTS_node)::MCTS_node
@@ -136,7 +130,7 @@ end
                 break
             elseif current_node.current_player == :short && -child.total_weight_at_end/child.visits + sqrt(2) * sqrt(log(current_node.visits)/child.visits) > ucb # child.visits ≠ 0
                 max_child = child
-                ucb = -(child.total_weight_at_end/child.visits + sqrt(2) * sqrt(log(current_node.visits)/child.visits))
+                ucb = -child.total_weight_at_end/child.visits + sqrt(2) * sqrt(log(current_node.visits)/child.visits)
             elseif current_node.current_player == :cut && child.total_weight_at_end/child.visits + sqrt(2) * sqrt(log(current_node.visits)/child.visits) > ucb
                 max_child = child
                 ucb = child.total_weight_at_end/child.visits + sqrt(2) * sqrt(log(current_node.visits)/child.visits)
@@ -153,18 +147,17 @@ end
 @inline function expand!(node::MCTS_node)::Tuple{MCTS_node,Float64}
     new_node = nothing
     terminal = false
-    println("Größe: ", length(collect(node.untried_actions)))
     if node.current_player == :short && get_component!(node.short_merged_graph.components, node.short_merged_graph.s.id) == get_component!(node.short_merged_graph.components, node.short_merged_graph.t.id) # dann haben wir schon einen s-t-Weg
         random_move = rand(collect(node.untried_actions)) # vielleicht noch nach Kantengewichten sortieren
         new_graph = copy(node.short_graph)
         push!(new_graph.edges, random_move)
         new_efficient_graph = copy(node.short_merged_graph)
         merge_components!(new_efficient_graph.components, random_move.u.id, random_move.v.id)
-        new_untried_actions = Base.setdiff(node.untried_actions, [random_move])
+        new_untried_actions = delete!(node.untried_actions, random_move)
         terminal = isempty(new_untried_actions)
         if terminal
             weight = dijkstra(node.graph, node.s, node.t)
-            new_node = MCTS_node(node, Base.Set{MCTS_node}(), 0.0, 0, new_graph, new_efficient_graph, :cut, true, new_untried_actions)
+            new_node = MCTS_node(node, Base.Set{MCTS_node}(), 0.0, 1, new_graph, new_efficient_graph, :cut, true, new_untried_actions)
             push!(node.children, new_node)
             return (new_node, weight)
         end
@@ -182,28 +175,33 @@ end
         push!(new_graph.edges, next_move)
         new_efficient_graph = copy(node.short_merged_graph)
         merge_components!(new_efficient_graph.components, next_move.u.id, next_move.v.id)
-        new_untried_actions = Base.setdiff(node.untried_actions, [next_move])
+        new_untried_actions = delete!(node.untried_actions, next_move)
         terminal = isempty(new_untried_actions)
         if terminal
             weight = dijkstra(node.graph, node.s, node.t)
-            new_node = MCTS_node(node, Base.Set{MCTS_node}(), 0.0, 0, new_graph, new_efficient_graph, :cut, true, new_untried_actions)
+            new_node = MCTS_node(node, Base.Set{MCTS_node}(), 0.0, 1, new_graph, new_efficient_graph, :cut, true, new_untried_actions)
             push!(node.children, new_node)
             return (new_node, weight)
         end
         new_node = MCTS_node(node, Base.Set{MCTS_node}(), 0.0, 0, new_graph, new_efficient_graph, :cut, false, new_untried_actions)
         push!(node.children, new_node)
     elseif node.current_player == :cut # zunächst angenommen, dass cut random züge spielt
-        # vielleicht noch optimieren, dass wenn s und t nicht in unterschiedlichen Zusammenhangskomponenten sind, das Spiel vorzeitig terminiert (short kassiert sowieso die Strafe)
         random_move = rand(collect(node.untried_actions))
-        new_untried_actions = Base.setdiff(node.untried_actions, [random_move])
+        new_efficient_graph = copy(node.short_merged_graph)
+        delete!(new_efficient_graph.edges, random_move)
+        new_untried_actions = delete!(node.untried_actions, random_move)
         terminal = isempty(new_untried_actions)
         if terminal
             weight = dijkstra(node.graph, node.s, node.t)
-            new_node = MCTS_node(node, Base.Set{MCTS_node}(), 0.0, 0, copy(node.short_graph), copy(node.short_merged_graph), :short, true, new_untried_actions)
+            new_node = MCTS_node(node, Base.Set{MCTS_node}(), 0.0, 1, copy(node.short_graph), new_efficient_graph, :short, true, new_untried_actions)
             push!(node.children, new_node)
             return (new_node, weight)
+        elseif !check_st_connection(new_efficient_graph) # dann hat cut schon gewonnen
+            new_node = MCTS_node(node, Base.Set{MCTS_node}(), 0.0, 1, copy(node.short_graph), new_efficient_graph, :short, true, new_untried_actions)
+            push!(node.children, new_node)
+            return (new_node, punishment)
         end
-        new_node = MCTS_node(node, Base.Set{MCTS_node}(), 0.0, 0, copy(node.short_graph), copy(node.short_merged_graph), :short, false, new_untried_actions)
+        new_node = MCTS_node(node, Base.Set{MCTS_node}(), 0.0, 0, copy(node.short_graph), new_efficient_graph, :short, false, new_untried_actions)
         push!(node.children, new_node)
     end
     new_node.visits += 1
@@ -220,15 +218,22 @@ end
             push!(new_graph.edges, random_move)
             new_efficient_graph = copy(current_node.short_merged_graph)
             merge_components!(new_efficient_graph.components, random_move.u.id, random_move.v.id)
-            new_untried_actions = Base.setdiff(current_node.untried_actions, [random_move])
+            new_untried_actions = delete!(current_node.untried_actions, random_move)
             terminal = isempty(new_untried_actions)
             new_node = MCTS_node(current_node, Base.Set{MCTS_node}(), 0.0, 0, new_graph, new_efficient_graph, :cut, terminal, new_untried_actions)
             push!(current_node.children, new_node)
         else
             random_move = rand(collect(current_node.untried_actions))
-            new_untried_actions = Base.setdiff(current_node.untried_actions, [random_move])
+            new_efficient_graph = copy(current_node.short_merged_graph)
+            delete!(new_efficient_graph.edges, random_move)
+            new_untried_actions = delete!(current_node.untried_actions, random_move)
             terminal = isempty(new_untried_actions)
-            new_node = MCTS_node(current_node, Base.Set{MCTS_node}(), 0.0, 0, copy(current_node.short_graph), copy(current_node.short_merged_graph), :short, terminal, new_untried_actions)
+            if !check_st_connection(new_efficient_graph) # dann hat cut schon gewonnen
+                new_node = MCTS_node(current_node, Base.Set{MCTS_node}(), 0.0, 1, copy(current_node.short_graph), new_efficient_graph, :short, terminal, new_untried_actions)
+                push!(current_node.children, new_node)
+                return (new_node, punishment)
+            end
+            new_node = MCTS_node(current_node, Base.Set{MCTS_node}(), 0.0, 0, copy(current_node.short_graph), new_efficient_graph, :short, terminal, new_untried_actions)
             push!(current_node.children, new_node)
         end
         current_node = new_node
@@ -244,9 +249,9 @@ end
         current_node = current_node.parent
     end
 end
- =#
-########################################################################################################
 
+########################################################################################################
+#=
 mutable struct MCTS_node
     parent::Union{MCTS_node, Nothing}
     children::Vector{MCTS_node} 
@@ -360,3 +365,4 @@ function backpropagate!(node::MCTS_node, weight::Float64)
         current = current.parent
     end
 end
+=#
