@@ -111,12 +111,10 @@ function make_move!(state::GameState, e::Edge)::Nothing
 end
 
 function check_winner(state::GameState)::Union{Symbol, Nothing}
-    if state.current_player == :short
-        check_st_connection(state.short_Graph) && return :short
-    else 
-        !(check_st_connection(state.graph)) && return :cut
-    end
-    return nothing 
+    !(isempty(valid_moves(state))) && return nothing
+    length = dijkstra(state.short_Graph, state.short_Graph.s, state.short_Graph.t)
+    println("Länge des kürzesten Weges von Short: ", length)
+    return :short
 end 
 
 function random_graph(n::Int, m::Int; weighted=false)::Union{GameGraph, Nothing} #n: Anzahl Knoten, m:Anzahl Kanten
@@ -182,37 +180,10 @@ function random_graph(n::Int, m::Int; weighted=false)::Union{GameGraph, Nothing}
     else 
         graph = random_graph(n, m)
         for edge in graph.edges
-            edge.weight = rand(-1000.0:1.0:1000.0)
+            edge.weight = rand(1.0:0.1:10.0)
         end
         return graph
     end
                   
 end
 
-function check_st_connection(graph::GameGraph)::Bool
-    queue = Vector{Vertex}()
-    visited = Dict{Int,Vertex}()
-    pushfirst!(queue, graph.s)
-    while length(queue) != 0
-        currentElement = popfirst!(queue)
-        merge!(visited, Dict(currentElement.id => currentElement))
-        newVertices = Vector{Vertex}()
-        for i ∈ eachindex(graph.edges)
-            if graph.edges[i].u === currentElement
-                if graph.edges[i].v === graph.t
-                    return true
-                elseif get(visited, graph.edges[i].v.id, -1) == -1
-                    push!(newVertices, graph.edges[i].v)
-                end
-            elseif graph.edges[i].v === currentElement
-                if graph.edges[i].u === graph.t
-                    return true
-                elseif get(visited, graph.edges[i].u.id, -1) == -1
-                    push!(newVertices, graph.edges[i].u)
-                end
-            end
-        end
-        append!(queue, newVertices)
-    end
-    return false
-end

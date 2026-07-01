@@ -867,8 +867,55 @@ function run_gui()
             Cairo.set_dash(ctx, Float64[], 0.0)
         end
 
+        # 1. Kante zeichnen
         draw_curve(ctx, x1, y1, x2, y2, offset)
         Cairo.set_dash(ctx, Float64[], 0.0)
+
+    # ==========================================
+    # NEU: Kantengewicht anzeigen
+    # ==========================================
+    
+    # Text-Eigenschaften festlegen
+        Cairo.set_font_size(ctx, 13.0)
+        Cairo.select_font_face(ctx, "Sans", Cairo.FONT_SLANT_NORMAL, Cairo.FONT_WEIGHT_BOLD)
+    
+    # Textfarbe wählen (z. B. Dunkelgrau/Schwarz, damit es lesbar ist)
+        Cairo.set_source_rgb(ctx, 0.2, 0.2, 0.2)
+
+    # Gewicht in einen String umwandeln (z.B. "4.5" oder als Int "4", falls glatt)
+        weight_str = edge.weight == round(edge.weight) ? string(Int(edge.weight)) : string(edge.weight)
+
+    # Mittelpunkt der Kurve berechnen
+    # Da draw_curve vermutlich quadratische Bezier-Kurven nutzt, ist hier eine gute Annäherung 
+    # für die Textposition (inklusive des Offsets rechtwinklig zur Linie):
+        mx = (x1 + x2) / 2
+        my = (y1 + y2) / 2
+
+        if offset != 0
+        # Berechne den Normalenvektor für die Verschiebung des Textes bei Kurven
+            dx = x2 - x1
+            dy = y2 - y1
+            len = sqrt(dx^2 + dy^2)
+            if len > 0
+            # Verschiebe den Text leicht in Richtung des Kurvenbogens (oder entgegengesetzt)
+            # 0.5 * offset ist oft ein guter Wert, damit der Text auf/neben der Kurve sitzt
+                mx += (-dy / len) * (offset * 0.5)
+                my += (dx / len) * (offset * 0.5)
+            end
+        end
+
+    # Text zentrieren: Ausdehnung des Textes bestimmen
+        extents = Cairo.text_extents(ctx, weight_str)
+    # extents[1] = x_bearing, extents[2] = y_bearing, extents[3] = width, extents[4] = height
+    
+    # Textposition so anpassen, dass mx/my exakt die Mitte des Textes ist
+    # Wir fügen einen kleinen zusätzlichen Offset hinzu (z. B. -10), damit der Text *über* der Kante schwebt
+        text_x = mx - (extents[3] / 2 + extents[1])
+        text_y = my - (extents[4] / 2 + extents[2]) - 8 
+
+    # Text auf das Canvas zeichnen
+        Cairo.move_to(ctx, text_x, text_y)
+        Cairo.show_text(ctx, weight_str)
     end
 
     """

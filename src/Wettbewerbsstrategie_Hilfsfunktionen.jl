@@ -420,7 +420,7 @@ function dijkstra(g::GameGraph, s::Vertex, t::Vertex)::Float64
     # 1. Maximale ID finden (für performante Array-Allokationen statt Dicts)
     max_id = isempty(g.vertices) ? 0 : maximum(v -> v.id, g.vertices)
     if max_id == 0
-        return Inf
+        return punishment
     end
 
     # 2. Adjazenzliste aufbauen: Knoten-ID -> Liste von (Nachbar-ID, Gewicht)
@@ -476,7 +476,7 @@ function dijkstra(g::GameGraph, s::Vertex, t::Vertex)::Float64
         end
     end
     # Wenn wir hier ankommen, wurde das Ziel t nicht erreicht
-    return Inf 
+    return punishment
 end
  
 # using BenchmarkTools
