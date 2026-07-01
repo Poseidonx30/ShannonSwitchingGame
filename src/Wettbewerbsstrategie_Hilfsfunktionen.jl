@@ -34,6 +34,7 @@ end
 mutable struct ExtendedGameState
     graph::EfficientGameGraph
     merged_graph::EfficientGameGraph
+    short_graph::GameGraph
     A::Base.Set{Edge} 
     B::Base.Set{Edge} 
     e1::Edge
@@ -46,6 +47,10 @@ mutable struct ExtendedGameState
 end
 
 Base.copy(ct::ComponentTracker)::ComponentTracker = ComponentTracker(copy(ct.parent), copy(ct.size), copy(ct.id_to_idx), copy(ct.idx_to_id))
+
+Base.copy(g::GameGraph)::GameGraph = GameGraph(copy(g.vertices), copy(g.edges), g.s, g.t)
+
+Base.copy(g::EfficientGameGraph)::EfficientGameGraph = EfficientGameGraph(copy(g.edges), copy(g.components), g.s, g.t)
 
 function _find_idx!(ct::ComponentTracker, idx::Int)::Int
     if ct.parent[idx] == idx
@@ -474,7 +479,7 @@ function dijkstra(g::GameGraph, s::Vertex, t::Vertex)::Float64
     return Inf 
 end
  
-using BenchmarkTools
+# using BenchmarkTools
 #####################################################################TEST FÜR MINHEAP###############################################
 #= println("Generiere Testdaten...")
 N = 10_000  # Anzahl der Elemente im Heap
@@ -497,13 +502,13 @@ println("\n--- Benchmark: extract_min! ---")
     extract_min!(h_copy)
 end =#
 ##########################################################################TEST FÜR DIJKSTRA##################################################
-n = 1000
+#= n = 1000
 m = 1500
 println("Generiere Zufallsgraphen mit $n Knoten und $m Kanten...")
 g = random_graph(n, m, weighted = true)
 println("Benchmark startet. Das kann einen Moment dauern...")
 # 3. Dijkstra benchmarken
-@btime dijkstra($g, $g.s, $g.t)
+@btime dijkstra($g, $g.s, $g.t) =#
 
 #########################################################################ALTER CODE###########################################################
 #= mutable struct MinHeap
