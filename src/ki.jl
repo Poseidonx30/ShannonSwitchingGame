@@ -138,15 +138,22 @@ end
 
 function chase(g::GameState)
     if g.has_winning_strategy == g.current_player # Computer kann gewinnen
+        skip = false
         if isempty(g.history)
-            last_move = g.e1  
+            if g.e1 ∈ g.A
+                last_move = g.e1
+            else 
+                last_move = rand(setdiff(symdiff(g.A, g.B), [g.e1, g.e2]))
+                push!(g.imaginary_moves, last_move)
+                skip = true
+            end   
         else
             last_move = g.history[end][2]
         end 
         T1_has_move = (last_move ∈ g.A)
         T2_has_move = (last_move ∈ g.B)
-        if (T1_has_move && T2_has_move) || (!T1_has_move && !T2_has_move) || last_move ∈ g.imaginary_moves
-            last_move = rand(symdiff(g.A, g.B))
+        if (T1_has_move && T2_has_move) || (!T1_has_move && !T2_has_move) || (last_move ∈ g.imaginary_moves && !skip)
+            last_move = rand(setdiff(symdiff(g.A, g.B), [g.e1, g.e2]))
             push!(g.imaginary_moves, last_move)
             T1_has_move = (last_move ∈ g.A)
             T2_has_move = !T1_has_move
