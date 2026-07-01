@@ -43,7 +43,7 @@ function weighted_cut(state::GameState)::Edge
             cuts_edge = chase(EXTENDED_STATE[], state)
         else
             println("hallo")
-            cuts_edge = MCTS(state)
+            cuts_edge = MCTS(EXTENDED_STATE[], state)
         end 
     end 
     delete!(EXTENDED_STATE[].merged_graph.edges, cuts_edge)
@@ -66,7 +66,7 @@ function weighted_short(state::GameState)::Edge
     if EXTENDED_STATE[].winner == :cut  
         return rand(valid_moves(state))
     end
-    shorts_edge = MCTS(state)
+    shorts_edge = MCTS(EXTENDED_STATE[], state)
     merge_components!(EXTENDED_STATE[].merged_graph.components, shorts_edge.u.id, shorts_edge.v.id) 
     if len !=0
         delete!(EXTENDED_STATE[].merged_graph.edges, state.history[end][2])
@@ -247,91 +247,51 @@ end
  =#
 ########################################################################################################
 
-# Die Struct bleibt größtenteils gleich, aber untried_actions muss sauber 
-# als "noch nicht als MCTS-Kindknoten erstellte Züge" verstanden werden.
 mutable struct MCTS_node
     parent::Union{MCTS_node, Nothing}
-    children::Vector{MCTS_node} # Vector ist oft schneller zu durchlaufen als Set
+    children::Vector{MCTS_node} 
     total_weight_at_end::Float64
     visits::Int
     short_graph::GameGraph
     short_merged_graph::EfficientGameGraph
     current_player::Symbol
     terminal::Bool
-    
-    # Züge, die IN DIESEM ZUSTAND möglich sind, für die aber noch 
-    # kein Kind-Knoten im Baum existiert.
     untried_actions::Base.Set{Edge} 
-    
-    # Alle Züge, die im Spiel ab diesem Knoten noch legal/frei sind.
-    # Wichtig für die Weitergabe an die Kinder.
     legal_moves::Base.Set{Edge} 
 end
 
-function MCTS(orig_state::GameState; time_limit = 1.0)::Edge 
+function MCTS(state::ExtendedGameState, orig_state::GameState; time_limit = 1.0)::Edge 
     start_time = time()
-    legal_moves = Base.Set(valid_moves(orig_state))
-    
-    root_node = MCTS_node(
-        nothing, MCTS_node[], 0.0, 0, 
-        orig_state.short_graph, orig_state.merged_graph, 
-        :short, false, 
-        copy(legal_moves), copy(legal_moves)
-    )
-
+    legal_moves = Base.Set(valid_moves(orig_state))  
+    root_node = MCTS_node(nothing, MCTS_node[], 0.0, 0, state.short_graph, state.merged_graph, :short, false, copy(legal_moves), copy(legal_moves))
     while time() - start_time < time_limit
-        # 1. SELECT
         node = select_node(root_node)
-        
-        # 2. EXPAND
         if !node.terminal
             node = expand!(node)
         end
-        
-        # 3. SIMULATE
         weight = simulate(node)
-        
-        # 4. BACKPROPAGATE
         backpropagate!(node, weight)
     end
-
-    # Zugauswahl am Ende: Wähle das Kind mit den meisten Visits (Standard bei MCTS)
-    best_child = argmax(child -> child.visits, root_node.children)
-    
-    # Finde heraus, welche Kante zu diesem Kind geführt hat
-    # (Einfacher Set-Unterschied der Graphen)
+    best_child = argmax(child -> child.visits, root_node.children)   
     return first(setdiff(best_child.short_graph.edges, root_node.short_graph.edges))
 end 
 
-# ==========================================
-# 1. SELECT
-# ==========================================
 function select_node(node::MCTS_node)::MCTS_node
     current_node = node
-    # Solange der Knoten vollständig expandiert ist UND nicht terminal
     while isempty(current_node.untried_actions) && !current_node.terminal
-        # Wähle das beste Kind basierend auf der UCB1-Formel
         best_score = -Inf
-        best_child = nothing
-        
+        best_child = nothing       
         for child in current_node.children
             if child.visits == 0
                 return child # Sollte theoretisch nicht passieren, aber als Fallback
-            end
-            
+            end           
             mean_weight = child.total_weight_at_end / child.visits
-            exploration = sqrt(2) * sqrt(log(current_node.visits) / child.visits)
-            
-            # WICHTIG: Die Perspektive ist die des current_node!
+            exploration = sqrt(2) * sqrt(log(current_node.visits) / child.visits)           
             if current_node.current_player == :short
-                # Short sucht den KÜRZESTEN Weg, will also das Gewicht MINIMIEREN.
-                # Um das Maximum zu finden, maximieren wir den negativen Wert.
                 score = -mean_weight + exploration
             else
-                # Cut will das Gewicht MAXIMIEREN.
                 score = mean_weight + exploration
-            end
-            
+            end          
             if score > best_score
                 best_score = score
                 best_child = child
@@ -342,15 +302,10 @@ function select_node(node::MCTS_node)::MCTS_node
     return current_node
 end
 
-# ==========================================
-# 2. EXPAND
-# ==========================================
 function expand!(node::MCTS_node)::MCTS_node
-    # Wähle eine noch nicht probierte Aktion und entferne sie aus den untried_actions
     action = rand(node.untried_actions)
     delete!(node.untried_actions, action)
     
-    # Kopiere den Graphenzustand für den NEUEN Kindknoten
     new_graph = copy(node.short_graph)
     new_efficient_graph = copy(node.short_merged_graph)
     
@@ -359,31 +314,18 @@ function expand!(node::MCTS_node)::MCTS_node
         merge_components!(new_efficient_graph.components, action.u.id, action.v.id)
     end
     
-    # Aktualisiere die noch im Spiel verfügbaren Züge
     new_legal_moves = copy(node.legal_moves)
     delete!(new_legal_moves, action)
     is_terminal = isempty(new_legal_moves)
     
     next_player = node.current_player == :short ? :cut : :short
     
-    # Erstelle das neue Kind
-    new_node = MCTS_node(
-        node, MCTS_node[], 0.0, 0, 
-        new_graph, new_efficient_graph, 
-        next_player, is_terminal, 
-        copy(new_legal_moves), new_legal_moves
-    )
-    
+    new_node = MCTS_node(node, MCTS_node[], 0.0, 0, new_graph, new_efficient_graph, next_player, is_terminal, copy(new_legal_moves), new_legal_moves)
     push!(node.children, new_node)
     return new_node
 end
 
-# ==========================================
-# 3. SIMULATE
-# ==========================================
 function simulate(node::MCTS_node)::Float64
-    # GANZ WICHTIG: Nur eine EINZIGE Kopie für die gesamte Simulation ziehen, 
-    # KEINE neuen MCTS_Knoten erstellen! Das spart massiv RAM und Zeit.
     sim_graph = copy(node.short_graph)
     sim_efficient = copy(node.short_merged_graph)
     sim_legal_moves = collect(node.legal_moves) # Vector für O(1) random access & delete
@@ -391,14 +333,10 @@ function simulate(node::MCTS_node)::Float64
     current_player = node.current_player
     
     while !isempty(sim_legal_moves)
-        # Zufälligen Zug auswählen
         idx = rand(1:length(sim_legal_moves))
         action = sim_legal_moves[idx]
-        
-        # Effizient aus dem Array löschen (tauscht das letzte Element an idx und macht pop)
         sim_legal_moves[idx] = sim_legal_moves[end]
-        pop!(sim_legal_moves)
-        
+        pop!(sim_legal_moves)       
         if current_player == :short
             push!(sim_graph.edges, action)
             merge_components!(sim_efficient.components, action.u.id, action.v.id)
@@ -407,19 +345,13 @@ function simulate(node::MCTS_node)::Float64
             if get_component!(sim_efficient.components, sim_graph.s.id) == get_component!(sim_efficient.components, sim_graph.t.id)
                 break 
             end
-        end
-        
+        end       
         current_player = current_player == :short ? :cut : :short
-    end
-    
+    end   
     weight = dijkstra(sim_graph, sim_graph.s, sim_graph.t)
-    # Strafpunkte, falls kein Weg existiert (Dijkstra gibt vermutlich Inf zurück)
-    return weight == Inf ? 100.0 : weight 
+    return weight  
 end
 
-# ==========================================
-# 4. BACKPROPAGATE
-# ==========================================
 function backpropagate!(node::MCTS_node, weight::Float64)
     current = node
     while !isnothing(current)

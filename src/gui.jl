@@ -778,9 +778,11 @@ function run_gui()
         if state.current_player == :cut
             t = time_ns()
             edge = weighted_cut(state)
-            println("on_move dauerte $((time_ns() - t)/1e6) ms")
+            println("Zugzeit $((time_ns() - t)/1e6) ms")
         else 
-            edge = rand(valid_moves(state))
+            t = time_ns()
+            edge = weighted_short(state)
+            println("zugzeit $((time_ns() - t)/1e6) ms")
         end 
         edge === nothing && return
         make_move!(state, edge)
@@ -1096,7 +1098,7 @@ function run_gui()
             return
         end
 
-        graph = random_graph(n, m)
+        graph = random_graph(n, m, weighted = true)
         if graph === nothing
             set_status!("Ungültige Eingabe: n muss > 3 sein, m mindestens n und nicht zu groß.")
             return
