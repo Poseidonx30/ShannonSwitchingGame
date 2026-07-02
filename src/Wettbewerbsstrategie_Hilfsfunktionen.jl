@@ -238,12 +238,15 @@ function who_can_win(g::ExtendedGameState, minimal::Bool)
     end
     g.A = T1_edges
     g.B = T2_edges
-    if e1 ∈ T2_edges || e2 ∈ T1_edges || e1 ∈ T1_edges
-        println("cut")
+    if e1 ∈ T2_edges || e2 ∈ T1_edges 
         g.has_winning_strategy = :cut
-    else 
-        println("short")
+        println(:cut)
+    elseif e1 ∈ T1_edges 
+        g.has_winning_strategy = g.current_player
+        println(g.current_player)
+    else
         g.has_winning_strategy = :short
+        println(:short)
     end
 end
 
@@ -264,11 +267,10 @@ function chase(g::ExtendedGameState, state::GameState)::Edge
     T1_has_move = (last_move ∈ g.A)
     T2_has_move = (last_move ∈ g.B)
     if (T1_has_move && T2_has_move) || (!T1_has_move && !T2_has_move) || last_move ∈ g.imaginary_moves || get_component!(g.merged_graph.components, last_move.u.id) == get_component!(g.merged_graph.components, last_move.v.id)
-        if !skip 
+        if !skip
             last_move = rand(setdiff(symdiff(g.A, g.B), [g.e1, g.e2]))   #nicht optimal für Short. Man sollte wahrscheinlich einen Zug wählen, auf den die Antwort möglichst günstig ist.
-            #Auf alle möglichen zufälligen Züge aus der sym.diff. die Antwort zu berechnen (ggf. zusammen mit MCTS) dauert vlt. aber zu lang
             push!(g.imaginary_moves, last_move)
-        end 
+        end
         T1_has_move = (last_move ∈ g.A)
         T2_has_move = !T1_has_move
     end 
@@ -286,7 +288,7 @@ function chase(g::ExtendedGameState, state::GameState)::Edge
         if next_move === nothing 
             println("das sollte nicht passieren")
             return rand(valid_moves(state)) #MCTS
-        end 
+        end
     else 
         fc_last = FC(last_move, T_strich, g.merged_graph.components)
         next_moves = Base.Set{Edge}()
@@ -299,8 +301,12 @@ function chase(g::ExtendedGameState, state::GameState)::Edge
             println("das sollte nicht passieren")
             return rand(valid_moves(state)) #MCTS 
         end
-        #println(length(next_moves))
-        next_move = minimum(next_moves, by = e -> e.weight)  #hier vlt. MCTS auf alle Antworten - für Short
+        next_move = first(next_moves)
+        for e in next_moves
+            if e.weight < next_move.weight
+                next_move = e
+            end
+        end
     end 
     T = (state.current_player == :cut) ? T_strich : T
     cut_move = (state.current_player == :cut) ? next_move : last_move
@@ -311,15 +317,10 @@ function chase(g::ExtendedGameState, state::GameState)::Edge
 end
 
 
-#Dein Alter Code befindet sich unten - Dijkstra hat bei mir im Benchmark nicht richtig funktioniert (hat immer 0.0 zurückgegeben)
-#Deine MinHeap Implementation ist von der Laufzeit nicht schlecht gewesen (die aktuelle ist bei extract_min! ca. doppelt so schnell, bei decrease_key ca gleich und bei insert ungefähr
-#3 mal so schnell. Aber es ist immernoch jeweils im Bereich von mikro bis nano sekunden also nicht so wichtig.
-#Der aktuelle dijkstra Alg. ist allerdings um einen Faktor 1000 schneller (von milli zu mikro)Sekunden.  (und er gibt nicht 0.0 zurück)
-
 mutable struct MinHeap
     elements::Vector{Tuple{Int,Float64}}
     size::Int
-    position::Vector{Int} # Vektor ist massiv schneller als Dict bei dichten IDs!
+    position::Vector{Int} 
 end
 
 function min_heapify!(A::MinHeap, i::Int)
@@ -327,67 +328,43 @@ function min_heapify!(A::MinHeap, i::Int)
         l = 2 * i
         r = 2 * i + 1
         smallest = i
-
-        # Finde das Minimum aus i, l und r (Fehler korrigiert)
         if l ≤ A.size && A.elements[l][2] < A.elements[smallest][2]
             smallest = l
         end
         if r ≤ A.size && A.elements[r][2] < A.elements[smallest][2]
             smallest = r
         end
-
-        # Wenn die Heap-Bedingung erfüllt ist, Abbruch
         smallest == i && break
-
-        # Elemente tauschen
         A.elements[i], A.elements[smallest] = A.elements[smallest], A.elements[i]
-        
-        # Positionen direkt aktualisieren (viel effizienter)
         A.position[A.elements[i][1]] = i
         A.position[A.elements[smallest][1]] = smallest
-
-        # i aktualisieren für den nächsten Schleifendurchlauf
         i = smallest
     end
     return A
 end
 
 function extract_min!(A::MinHeap)
-    A.size == 0 && error("Heap ist leer")
-    
-    min_elem = A.elements[1]
-    
-    # Das letzte Element an die Wurzel setzen
+    A.size == 0 && error("Heap ist leer")   
+    min_elem = A.elements[1]    
     A.elements[1] = A.elements[A.size]
-    A.position[A.elements[1][1]] = 1
-    
-    A.size -= 1
-    
-    # Aufgeräumt: Setze Position auf 0 (oder lösche sie bei einem Dict per delete!)
-    A.position[min_elem[1]] = 0 
-    
+    A.position[A.elements[1][1]] = 1    
+    A.size -= 1   
+    A.position[min_elem[1]] = 0    
     if A.size > 0
         min_heapify!(A, 1)
-    end
-    
+    end    
     return min_elem
 end
 
 function decrease_key!(A::MinHeap, i::Int, k::Float64)
-    A.elements[i][2] < k && error("Neuer Wert ist größer als aktueller Wert")
-    
-    A.elements[i] = (A.elements[i][1], k)
-    
+    A.elements[i][2] < k && error("Neuer Wert ist größer als aktueller Wert")    
+    A.elements[i] = (A.elements[i][1], k)   
     while i > 1
         parent = i ÷ 2
         if A.elements[parent][2] > A.elements[i][2]
-            # Elemente tauschen
             A.elements[i], A.elements[parent] = A.elements[parent], A.elements[i]
-            
-            # Positionen aktualisieren
             A.position[A.elements[i][1]] = i
-            A.position[A.elements[parent][1]] = parent
-            
+            A.position[A.elements[parent][1]] = parent            
             i = parent
         else
             break
@@ -396,86 +373,58 @@ function decrease_key!(A::MinHeap, i::Int, k::Float64)
 end
 
 function insert!(A::MinHeap, elems::Vector{Tuple{Int,Float64}})
-    # Vorab-Allokation für Array-Größe (verhindert ständige Reallokation)
     new_size = A.size + length(elems)
     if length(A.elements) < new_size
         resize!(A.elements, new_size)
     end
-
     for (id, weight) ∈ elems
         A.size += 1
         A.elements[A.size] = (id, Inf)
-        
-        # Stelle sicher, dass der Position-Vektor groß genug ist
         if length(A.position) < id
             resize!(A.position, max(id, length(A.position) * 2))
         end
-        A.position[id] = A.size
-        
+        A.position[id] = A.size        
         decrease_key!(A, A.size, weight)
     end
 end 
 
 function dijkstra(g::GameGraph, s::Vertex, t::Vertex)::Float64
-    # 1. Maximale ID finden (für performante Array-Allokationen statt Dicts)
     max_id = isempty(g.vertices) ? 0 : maximum(v -> v.id, g.vertices)
     if max_id == 0
         return punishment
     end
-
-    # 2. Adjazenzliste aufbauen: Knoten-ID -> Liste von (Nachbar-ID, Gewicht)
-    # Das reduziert die Laufzeit von O(V * E) auf O((V + E) * log(V))
     adj = [Tuple{Int, Float64}[] for _ in 1:max_id]
     for e in g.edges
         push!(adj[e.u.id], (e.v.id, e.weight))
         push!(adj[e.v.id], (e.u.id, e.weight)) 
     end
-
-    # 3. Distanz-Array initialisieren (schneller als im Heap nachzuschauen!)
     dist = fill(Inf, max_id)
     dist[s.id] = 0.0
-
-    # 4. Heap-Elemente vorbereiten
     elems = Vector{Tuple{Int,Float64}}(undef, length(g.vertices))
     for (i, vertex) in enumerate(g.vertices)
         elems[i] = (vertex.id, dist[vertex.id])
     end
-
-    # 5. Heap initialisieren (an neue Implementierung angepasst: Int[])
     heap = MinHeap(Tuple{Int,Float64}[], 0, Int[])
     insert!(heap, elems)
-
-    # 6. Hauptschleife
     while heap.size > 0
         u_id, u_dist = extract_min!(heap)
-
-        # Vorzeitiger Abbruch, wenn das Ziel gefunden wurde
-        if u_id == t.id
-            return u_dist
-        end
-        
-        # Falls der Rest des Graphen unerreichbar ist
         if u_dist == Inf 
             break 
         end
-
-        # NUR die benachbarten Kanten prüfen
+        if u_id == t.id
+            return u_dist
+        end        
         for (v_id, weight) in adj[u_id]
-            new_dist = u_dist + weight
-            
-            # Ist der neue Weg kürzer?
+            new_dist = u_dist + weight           
             if new_dist < dist[v_id]
-                dist[v_id] = new_dist
-                
+                dist[v_id] = new_dist                
                 pos = heap.position[v_id]
-                # Wichtig: Nur decrease_key! aufrufen, wenn v_id noch im Heap ist (pos > 0)
                 if pos > 0 
                     decrease_key!(heap, pos, new_dist)
                 end
             end
         end
     end
-    # Wenn wir hier ankommen, wurde das Ziel t nicht erreicht
     return punishment
 end
  
@@ -511,97 +460,3 @@ println("Benchmark startet. Das kann einen Moment dauern...")
 @btime dijkstra($g, $g.s, $g.t) =#
 
 #########################################################################ALTER CODE###########################################################
-#= mutable struct MinHeap
-    elements::Vector{Tuple{Int,Float64}}
-    size::Int
-    position::Dict{Int,Int} # speichert zu gegebener Knoten-ID die Position in elements ab
-end
-
-function min_heapify!(A::MinHeap, i::Int)
-    i > A.size && return A
-    l = 2*i
-    r = 2*i+1
-    if l ≤ A.size && A.elements[l][2] < A.elements[i][2]
-        smallest = l
-    else
-        smallest = i
-    end
-    if r ≤ A.size && A.elements[r][2] < A.elements[smallest][2]  #hier war ein kleiner Fehler - vorher A.elements[i][2]
-        smallest = r
-    end
-    if smallest != i
-        if smallest == l
-            temp = A.elements[i]
-            A.elements[i] = A.elements[l]
-            A.elements[l] = temp
-            A.position[A.elements[l][1]], A.position[A.elements[i][1]] = A.position[A.elements[i][1]], A.position[A.elements[l][1]]
-        else
-            temp = A.elements[i]
-            A.elements[i] = A.elements[r]
-            A.elements[r] = temp
-            A.position[A.elements[r][1]], A.position[A.elements[i][1]] = A.position[A.elements[i][1]], A.position[A.elements[r][1]]
-        end
-        return min_heapify!(A, smallest)
-    end
-    return A
-end
-
-function extract_min!(A::MinHeap)
-    A.elements[1], A.elements[A.size] = A.elements[A.size], A.elements[1]
-    A.position[A.elements[1][1]], A.position[A.elements[A.size][1]] = A.position[A.elements[A.size][1]], A.position[A.elements[1][1]]
-    A.size -= 1
-    min_heapify!(A,1)
-    return A.elements[A.size+1]
-end
-
-function decrease_key!(A::MinHeap,i::Int,k::Float64)
-    A.elements[i] = (A.elements[i][1],k)
-    while i > 1 && A.elements[i ÷ 2][2] > A.elements[i][2]
-        A.elements[i], A.elements[i÷2] = A.elements[i÷2], A.elements[i]
-        A.position[A.elements[i][1]], A.position[A.elements[i÷2][1]] = A.position[A.elements[i÷2][1]], A.position[A.elements[i][1]]
-        i = i÷2
-    end
-end
-
-function insert!(A::MinHeap, elems::Vector{Tuple{Int,Float64}})
-    sizehint!(A.position, length(elems))
-    for (id,weight) ∈ elems 
-        A.size += 1
-        if length(A.elements) >= A.size
-            A.elements[A.size] = (id,Inf)
-        else
-            push!(A.elements, (id,Inf))
-        end
-        A.position[id] = A.size
-        decrease_key!(A, A.size, weight)
-    end
-end  =#
-
-#= function dijkstra(g::GameGraph, s::Vertex, t::Vertex)::Float64 # gibt die Kosten eines minimalen s-t-Wegs zurück
-    heap = MinHeap([], 0, Dict())
-    result = 0.0
-    elems = Vector{Tuple{Int,Float64}}()
-    for vertex ∈ g.vertices
-        if vertex == s
-            push!(elems, (vertex.id, 0.0))
-        else
-            push!(elems, (vertex.id, Inf))
-        end
-    end
-    insert!(heap, elems)
-    while heap.size != 0
-        v = extract_min!(heap)
-        if v[1] == t.id
-            result = v[2]
-            break
-        end
-        for e ∈ g.edges
-            if e.u.id == v[1] && heap.elements[heap.position[e.v.id]][2] > v[2] + e.weight
-                decrease_key!(heap,heap.position[e.v.id],v[2] + e.weight)
-            elseif e.v.id == v[1] && heap.elements[heap.position[e.u.id]][2] > v[2] + e.weight
-                decrease_key!(heap,heap.position[e.u.id],v[2] + e.weight)
-            end
-        end
-    end
-    return result
-end  =#
