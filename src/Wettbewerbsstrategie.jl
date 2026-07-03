@@ -270,6 +270,10 @@ end
         delete!(short_merged_graph.edges, move)
     end
     deleteat!(untried_actions, findfirst(x -> x.id == move.id, untried_actions))
+    s_component = get_component!(short_merged_graph.components, short_merged_graph.s.id)
+    t_component = get_component!(short_merged_graph.components, short_merged_graph.t.id)
+    move_pos = findfirst(x -> x.id == move.id, untried_actions)
+    untried_actions = [edge for edge in state.merged_graph.edges if get_component!(short_merged_graph.components, untried_actions[move_pos].u.id) == s_component || get_component!(short_merged_graph.components, untried_actions[move_pos].v.id) == s_component || get_component!(short_merged_graph.components, untried_actions[move_pos].u.id) == t_component || get_component!(short_merged_graph.components, untried_actions[move_pos].v.id) == t_component]
 end
 
 @inline function make_move!(short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge}, move_pos::Int, player::Symbol)
@@ -285,7 +289,9 @@ end
     else
         delete!(short_merged_graph.edges, untried_actions[move_pos])
     end
-    deleteat!(untried_actions, move_pos)
+    s_component = get_component!(short_merged_graph.components, short_merged_graph.s.id)
+    t_component = get_component!(short_merged_graph.components, short_merged_graph.t.id)
+    untried_actions = [edge for edge in state.merged_graph.edges if get_component!(short_merged_graph.components, untried_actions[move_pos].u.id) == s_component || get_component!(short_merged_graph.components, untried_actions[move_pos].v.id) == s_component || get_component!(short_merged_graph.components, untried_actions[move_pos].u.id) == t_component || get_component!(short_merged_graph.components, untried_actions[move_pos].v.id) == t_component]
 end
 
 #= @inline function undo_move!(short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge}, move::Edge, player::Symbol)

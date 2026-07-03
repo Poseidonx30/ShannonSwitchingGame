@@ -499,7 +499,7 @@ function test()
     while i ≤ 2
         i += 1
 
-        n = rand(400:500)
+        n = rand(4:150)
         m = rand(n:min(2n - 1, n*(n-1)÷2 - 1))
 
         g = random_graph(n, m, weighted = true)
