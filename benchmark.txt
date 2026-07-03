@@ -2,6 +2,7 @@ Benchmark gestartet
 
 ========================================
 Spiel 1
+<<<<<<< HEAD
 Graph: n=11, m=12
 
 Gewinner: Computer
@@ -16,11 +17,28 @@ weighted_cut:
 weighted_short:
   mean: 1250.03 ms
   max:  1500.12 ms
+=======
+Graph: n=25, m=28
+
+Gewinner: Random
+
+Punkte Computer: 100.0
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 0.02 ms
+  max:  0.12 ms
+
+weighted_short:
+  mean: 964.33 ms
+  max:  1501.87 ms
+>>>>>>> 76f606bb5ba03e2a0a6e5bef8c8be678b07a5a05
 
 Fehler aufgetreten: false
 
 ========================================
 Spiel 2
+<<<<<<< HEAD
 Graph: n=6, m=6
 
 Gewinner: Random
@@ -35,11 +53,28 @@ weighted_cut:
 weighted_short:
   mean: 1000.0 ms
   max:  1500.0 ms
+=======
+Graph: n=18, m=24
+
+Gewinner: Computer
+
+Punkte Computer: 10.4
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 0.02 ms
+  max:  0.09 ms
+
+weighted_short:
+  mean: 1375.29 ms
+  max:  1503.3 ms
+>>>>>>> 76f606bb5ba03e2a0a6e5bef8c8be678b07a5a05
 
 Fehler aufgetreten: false
 
 ========================================
 Spiel 3
+<<<<<<< HEAD
 Graph: n=4, m=5
 
 Gewinner: Computer
@@ -54,11 +89,28 @@ weighted_cut:
 weighted_short:
   mean: 0.01 ms
   max:  0.02 ms
+=======
+Graph: n=25, m=25
+
+Gewinner: Random
+
+Punkte Computer: 100.0
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 0.02 ms
+  max:  0.12 ms
+
+weighted_short:
+  mean: 230.95 ms
+  max:  1502.92 ms
+>>>>>>> 76f606bb5ba03e2a0a6e5bef8c8be678b07a5a05
 
 Fehler aufgetreten: false
 
 ========================================
 Spiel 4
+<<<<<<< HEAD
 Graph: n=11, m=21
 
 Gewinner: Computer
@@ -73,11 +125,28 @@ weighted_cut:
 weighted_short:
   mean: 681.83 ms
   max:  1500.01 ms
+=======
+Graph: n=22, m=42
+
+Gewinner: Computer
+
+Punkte Computer: 5.1
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 1074.6 ms
+  max:  1543.4 ms
+
+weighted_short:
+  mean: 714.32 ms
+  max:  1500.48 ms
+>>>>>>> 76f606bb5ba03e2a0a6e5bef8c8be678b07a5a05
 
 Fehler aufgetreten: false
 
 ========================================
 Spiel 5
+<<<<<<< HEAD
 Graph: n=18, m=33
 
 Gewinner: Computer
@@ -92,11 +161,28 @@ weighted_cut:
 weighted_short:
   mean: 176.48 ms
   max:  1500.0 ms
+=======
+Graph: n=18, m=22
+
+Gewinner: Computer
+
+Punkte Computer: 17.0
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 0.02 ms
+  max:  0.11 ms
+
+weighted_short:
+  mean: 1363.63 ms
+  max:  1501.14 ms
+>>>>>>> 76f606bb5ba03e2a0a6e5bef8c8be678b07a5a05
 
 Fehler aufgetreten: false
 
 ========================================
 Spiel 6
+<<<<<<< HEAD
 Graph: n=6, m=7
 
 Gewinner: Computer
@@ -111,11 +197,28 @@ weighted_cut:
 weighted_short:
   mean: 1125.01 ms
   max:  1500.01 ms
+=======
+Graph: n=19, m=23
+
+Gewinner: Computer
+
+Punkte Computer: 12.9
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 0.03 ms
+  max:  0.14 ms
+
+weighted_short:
+  mean: 1375.53 ms
+  max:  1503.21 ms
+>>>>>>> 76f606bb5ba03e2a0a6e5bef8c8be678b07a5a05
 
 Fehler aufgetreten: false
 
 ========================================
 Spiel 7
+<<<<<<< HEAD
 Graph: n=5, m=8
 
 Gewinner: Computer
@@ -206,6 +309,22 @@ weighted_cut:
 weighted_short:
   mean: 1350.01 ms
   max:  1500.01 ms
+=======
+Graph: n=17, m=21
+
+Gewinner: Random
+
+Punkte Computer: 100.0
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 0.02 ms
+  max:  0.11 ms
+
+weighted_short:
+  mean: 681.8 ms
+  max:  1500.47 ms
+>>>>>>> 76f606bb5ba03e2a0a6e5bef8c8be678b07a5a05
 
 Fehler aufgetreten: false
 

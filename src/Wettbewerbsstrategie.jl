@@ -174,7 +174,7 @@ end
                 found_node = true
                 break
             end 
-            C = 10.0
+            C = 10
             exploration = C * sqrt(2.0 * log_parent_visits / child.visits)
             exploitation = child.total_weight_at_end / child.visits
 
