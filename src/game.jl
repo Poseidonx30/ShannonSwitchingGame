@@ -98,13 +98,13 @@ function make_move!(state::GameState, e::Edge)::Nothing
             push!(state.short_Graph.vertices, e.v)
         end
         e.state = :short
-        state.winner = check_winner(state)
+        #state.winner = check_winner(state)
         state.current_player = :cut
     else
         new_Game_Graph_edges = [edge for edge in state.graph.edges if (edge !== e)]
         state.graph.edges = new_Game_Graph_edges
         e.state = :cut
-        state.winner = check_winner(state)
+        #state.winner = check_winner(state)
         state.current_player = :short
     end
     return nothing

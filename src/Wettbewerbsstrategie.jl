@@ -1,7 +1,5 @@
 const TEAM_NAME::String = "StockFisch 1.0"
 
-const punishment = 100.0
-
 Base.isequal(E1::Edge, E2::Edge) = E1.id == E2.id # es gibt nicht zwei gleiche Kanten mit unterschiedlicher ID
 Base.hash(E::Edge, h::UInt) = hash(E.id, h)
 
@@ -36,7 +34,7 @@ function weighted_cut(state::GameState)::Edge
     end
     if shorts_edge.v ∉ short_graph.vertices
         push!(short_graph.vertices, shorts_edge.v)
-    end 
+    end  
     if EXTENDED_STATE[].has_winning_strategy == :cut
         cuts_edge = chase(EXTENDED_STATE[], state)
     else 
@@ -51,12 +49,11 @@ function weighted_cut(state::GameState)::Edge
             EXTENDED_STATE[].first_optimal_move = true 
             cuts_edge = chase(EXTENDED_STATE[], state)
         else
-            println("hallo")
             end_time = time()   
-            cuts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.8 - (end_time - start_time))
+            cuts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.5 - (end_time - start_time))
         end 
-        delete!(EXTENDED_STATE[].merged_graph.edges, cuts_edge)
     end 
+    delete!(EXTENDED_STATE[].merged_graph.edges, cuts_edge)
     return cuts_edge
 end
 
@@ -92,9 +89,8 @@ function weighted_short(state::GameState)::Edge
             EXTENDED_STATE[].first_optimal_move = true 
             shorts_edge = chase(EXTENDED_STATE[], state)
         else
-            println("hallo")
             end_time = time()
-            shorts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.8 - (end_time - start_time))
+            shorts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.5 - (end_time - start_time))
         end 
     end 
     if !(get_component!(merged_graph.components, shorts_edge.u.id) == get_component!(merged_graph.components, merged_graph.s.id) && get_component!(merged_graph.components, shorts_edge.v.id) == get_component!(merged_graph.components, merged_graph.t.id) 
@@ -111,7 +107,7 @@ function weighted_short(state::GameState)::Edge
     end
     if shorts_edge.v ∉ short_graph.vertices
         push!(short_graph.vertices, shorts_edge.v)
-    end
+    end 
     return shorts_edge
 end
 
@@ -128,7 +124,6 @@ end
 function MCTS(state::ExtendedGameState, orig_state::GameState; time_limit = 1.0)::Edge # state.graph muss die von short beanspruchten Kanten enthalten, WICHTIG: die Zusammenhangskomponenten von ComponentTracker müssen berichtigt werden, wenn der Anfangsgraph nicht-leer ist
     start_time = time()
     root_node = MCTS_node(nothing, Vector{MCTS_node}(), 0.0, 0, :short, false, nothing)
-    avg_call_time = [] # nur für Tests
     s_component = get_component!(state.merged_graph.components, state.merged_graph.s.id)
     t_component = get_component!(state.merged_graph.components, state.merged_graph.t.id)
     untried_actions_at_root = [edge for edge in state.merged_graph.edges if get_component!(state.merged_graph.components, edge.u.id) == s_component || get_component!(state.merged_graph.components, edge.v.id) == s_component || get_component!(state.merged_graph.components, edge.u.id) == t_component || get_component!(state.merged_graph.components, edge.v.id) == t_component]
@@ -136,12 +131,7 @@ function MCTS(state::ExtendedGameState, orig_state::GameState; time_limit = 1.0)
         untried_actions_at_root = valid_moves(orig_state)
     end
     while true
-        last_time = time_ns()
         if time() - start_time >= time_limit
-            if isempty(avg_call_time)
-            else 
-                println("Limit erreicht, durchschnittliche Rechenzeit für einen Aufruf: ", sum(avg_call_time)/length(avg_call_time), " ms")
-            end
             break 
         end
         short_graph = copy(state.short_graph)
@@ -151,28 +141,22 @@ function MCTS(state::ExtendedGameState, orig_state::GameState; time_limit = 1.0)
         node = select(root_node, short_graph, short_merged_graph, untried_actions)
         if node.terminal
             backpropagate!(node, node.total_weight_at_end / node.visits)
-            push!(avg_call_time, (time_ns() - last_time)/1e6)
             continue
         end
         node = expand!(node, short_graph, short_merged_graph, untried_actions)
         if node[2] != -1 # dann ist der expandierte Zustand ein Endzustand
             backpropagate!(node[1], node[2])
-            push!(avg_call_time, (time_ns() - last_time)/1e6)
             continue
         end
         weight = simulate!(node[1], short_graph, short_merged_graph, untried_actions)
         backpropagate!(node[1], weight)
-        
-        push!(avg_call_time, (time_ns() - last_time)/1e6)
     end
     max_child = argmax(x -> x.visits, root_node.children) 
-    # println("Iterationen: ", length(avg_call_time))
     return max_child.last_move
 end 
 
 @inline function select(node::MCTS_node, short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge})::MCTS_node
     current_node = node
-    # möglicherweise noch nicht besuchte Kinder bevorzugen
     while !isempty(current_node.children)
         ucb = -Inf
         max_child = nothing
@@ -241,7 +225,9 @@ end
         end
         new_node = MCTS_node(node, Vector{MCTS_node}(), 0.0, 0, :short, false, random_move)
         push!(node.children, new_node)
-        # TODO: Logik für expanden aller möglichen Züge hinzufügen
+        for i in 1:length(untried_actions)
+            push!(node.children, MCTS_node(node, Vector{MCTS_node}(), 0.0, 0, :short, false, untried_actions[i]))
+        end
     end
     new_node.visits += 1
     return (new_node,-1)
@@ -276,7 +262,7 @@ end
         end
         if move.v ∉ short_graph.vertices
             push!(short_graph.vertices, move.v)
-        end
+        end 
         merge_components!(short_merged_graph.components, move.u.id, move.v.id)
     else
         delete!(short_merged_graph.edges, move)
@@ -292,7 +278,7 @@ end
         end
         if untried_actions[move_pos].v ∉ short_graph.vertices
             push!(short_graph.vertices, untried_actions[move_pos].v)
-        end
+        end 
         merge_components!(short_merged_graph.components, untried_actions[move_pos].u.id, untried_actions[move_pos].v.id)
     else
         delete!(short_merged_graph.edges, untried_actions[move_pos])
@@ -300,7 +286,7 @@ end
     deleteat!(untried_actions, move_pos)
 end
 
-@inline function undo_move!(short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge}, move::Edge, player::Symbol)
+#= @inline function undo_move!(short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge}, move::Edge, player::Symbol)
     if player == :short
         delete!(short_graph.edges, move)
         # split_components!(short_merged_graph.components, move.u.id, move.v.id)
@@ -308,39 +294,5 @@ end
         push!(short_merged_graph.edges, move)
     end
     push!(untried_actions, move)
-end
+end =#
 
-#=
-┌ Warning: Executing on_canvas_pressed:
-└ @ Gtk4.GLib ~/.julia/packages/Gtk4/IynXD/src/GLib/signals.jl:142
-ERROR: ArgumentError: collection must be non-empty
-Stacktrace:
-  [1] Sampler
-    @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Random/src/generation.jl:460 [inlined]
-  [2] Sampler
-    @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Random/src/generation.jl:481 [inlined]
-  [3] Sampler
-    @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Random/src/Random.jl:141 [inlined]
-  [4] rand(rng::Random.TaskLocalRNG, X::Set{ShannonSwitchingGame.Edge})
-    @ Random ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Random/src/Random.jl:255
-  [5] rand
-    @ ~/.julia/juliaup/julia-1.12.6+0.x64.linux.gnu/share/julia/stdlib/v1.12/Random/src/Random.jl:260 [inlined]
-  [6] chase(g::ShannonSwitchingGame.ExtendedGameState, state::ShannonSwitchingGame.GameState)
-    @ ShannonSwitchingGame ~/Documents/computerorientierte_Mathematik_II/Programmierprojekt/ShannonSwitchingGame/src/Wettbewerbsstrategie_Hilfsfunktionen.jl:259
-  [7] weighted_short(state::ShannonSwitchingGame.GameState)
-    @ ShannonSwitchingGame ~/Documents/computerorientierte_Mathematik_II/Programmierprojekt/ShannonSwitchingGame/src/Wettbewerbsstrategie.jl:93
-  [8] (::ShannonSwitchingGame.var"#computer_move!#run_gui##37"{ShannonSwitchingGame.var"#refresh!#run_gui##13"{ShannonSwitchingGame.var"#update_status!#run_gui##12"{ShannonSwitchingGame.var"#set_status!#run_gui##6"{Gtk4.GtkLabelLeaf}, ShannonSwitchingGame.var"#player_name#run_gui##5"{Base.RefValue{String}, Base.RefValue{String}}, ShannonSwitchingGame.var"#is_computer_turn#run_gui##3"{ShannonSwitchingGame.var"#computer_player#run_gui##2"{ShannonSwitchingGame.var"#human_player#run_gui##1"{Gtk4.GtkDropDownLeaf}}, ShannonSwitchingGame.var"#is_computer_game#run_gui##0"{Gtk4.GtkDropDownLeaf}}, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, ShannonSwitchingGame.var"#update_history!#run_gui##11"{ShannonSwitchingGame.var"#move_name#run_gui##10"{ShannonSwitchingGame.var"#edge_name#run_gui##9"{ShannonSwitchingGame.var"#vertex_name#run_gui##8"}, ShannonSwitchingGame.var"#player_name#run_gui##5"{Base.RefValue{String}, Base.RefValue{String}}}, Gtk4.GtkLabelLeaf, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, ShannonSwitchingGame.var"#update_turn_label!#run_gui##7"{ShannonSwitchingGame.var"#player_name#run_gui##5"{Base.RefValue{String}, Base.RefValue{String}}, Gtk4.GtkLabelLeaf, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, Gtk4.GtkCanvas}, ShannonSwitchingGame.var"#is_computer_turn#run_gui##3"{ShannonSwitchingGame.var"#computer_player#run_gui##2"{ShannonSwitchingGame.var"#human_player#run_gui##1"{Gtk4.GtkDropDownLeaf}}, ShannonSwitchingGame.var"#is_computer_game#run_gui##0"{Gtk4.GtkDropDownLeaf}}, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}})()
-    @ ShannonSwitchingGame ~/Documents/computerorientierte_Mathematik_II/Programmierprojekt/ShannonSwitchingGame/src/gui.jl:784
-  [9] (::ShannonSwitchingGame.var"#on_canvas_pressed#run_gui##56"{ShannonSwitchingGame.var"#computer_move!#run_gui##37"{ShannonSwitchingGame.var"#refresh!#run_gui##13"{ShannonSwitchingGame.var"#update_status!#run_gui##12"{ShannonSwitchingGame.var"#set_status!#run_gui##6"{Gtk4.GtkLabelLeaf}, ShannonSwitchingGame.var"#player_name#run_gui##5"{Base.RefValue{String}, Base.RefValue{String}}, ShannonSwitchingGame.var"#is_computer_turn#run_gui##3"{ShannonSwitchingGame.var"#computer_player#run_gui##2"{ShannonSwitchingGame.var"#human_player#run_gui##1"{Gtk4.GtkDropDownLeaf}}, ShannonSwitchingGame.var"#is_computer_game#run_gui##0"{Gtk4.GtkDropDownLeaf}}, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, ShannonSwitchingGame.var"#update_history!#run_gui##11"{ShannonSwitchingGame.var"#move_name#run_gui##10"{ShannonSwitchingGame.var"#edge_name#run_gui##9"{ShannonSwitchingGame.var"#vertex_name#run_gui##8"}, ShannonSwitchingGame.var"#player_name#run_gui##5"{Base.RefValue{String}, Base.RefValue{String}}}, Gtk4.GtkLabelLeaf, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, ShannonSwitchingGame.var"#update_turn_label!#run_gui##7"{ShannonSwitchingGame.var"#player_name#run_gui##5"{Base.RefValue{String}, Base.RefValue{String}}, Gtk4.GtkLabelLeaf, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, Gtk4.GtkCanvas}, ShannonSwitchingGame.var"#is_computer_turn#run_gui##3"{ShannonSwitchingGame.var"#computer_player#run_gui##2"{ShannonSwitchingGame.var"#human_player#run_gui##1"{Gtk4.GtkDropDownLeaf}}, ShannonSwitchingGame.var"#is_computer_game#run_gui##0"{Gtk4.GtkDropDownLeaf}}, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, ShannonSwitchingGame.var"#clicked_edge#run_gui##31"{ShannonSwitchingGame.var"#distance_to_drawn_edge#run_gui##30"{ShannonSwitchingGame.var"#distance_to_edge#run_gui##29", ShannonSwitchingGame.var"#point_on_curve#run_gui##28", ShannonSwitchingGame.var"#curve_control_point#run_gui##27"}, ShannonSwitchingGame.var"#visual_offset#run_gui##26", ShannonSwitchingGame.var"#parallel_offsets#run_gui##21"{ShannonSwitchingGame.var"#edge_key#run_gui##15"}, ShannonSwitchingGame.var"#all_known_edges#run_gui##16", ShannonSwitchingGame.var"#node_positions#run_gui##14", Gtk4.GtkCanvas}, ShannonSwitchingGame.var"#refresh!#run_gui##13"{ShannonSwitchingGame.var"#update_status!#run_gui##12"{ShannonSwitchingGame.var"#set_status!#run_gui##6"{Gtk4.GtkLabelLeaf}, ShannonSwitchingGame.var"#player_name#run_gui##5"{Base.RefValue{String}, Base.RefValue{String}}, ShannonSwitchingGame.var"#is_computer_turn#run_gui##3"{ShannonSwitchingGame.var"#computer_player#run_gui##2"{ShannonSwitchingGame.var"#human_player#run_gui##1"{Gtk4.GtkDropDownLeaf}}, ShannonSwitchingGame.var"#is_computer_game#run_gui##0"{Gtk4.GtkDropDownLeaf}}, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, ShannonSwitchingGame.var"#update_history!#run_gui##11"{ShannonSwitchingGame.var"#move_name#run_gui##10"{ShannonSwitchingGame.var"#edge_name#run_gui##9"{ShannonSwitchingGame.var"#vertex_name#run_gui##8"}, ShannonSwitchingGame.var"#player_name#run_gui##5"{Base.RefValue{String}, Base.RefValue{String}}}, Gtk4.GtkLabelLeaf, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, ShannonSwitchingGame.var"#update_turn_label!#run_gui##7"{ShannonSwitchingGame.var"#player_name#run_gui##5"{Base.RefValue{String}, Base.RefValue{String}}, Gtk4.GtkLabelLeaf, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, Gtk4.GtkCanvas}, ShannonSwitchingGame.var"#is_computer_turn#run_gui##3"{ShannonSwitchingGame.var"#computer_player#run_gui##2"{ShannonSwitchingGame.var"#human_player#run_gui##1"{Gtk4.GtkDropDownLeaf}}, ShannonSwitchingGame.var"#is_computer_game#run_gui##0"{Gtk4.GtkDropDownLeaf}}, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}})(controller::Gtk4.GtkGestureClickLeaf, n_press::Int32, x::Float64, y::Float64)
-    @ ShannonSwitchingGame ~/Documents/computerorientierte_Mathematik_II/Programmierprojekt/ShannonSwitchingGame/src/gui.jl:1164
- [10] #GClosureMarshal##0
-    @ ~/.julia/packages/Gtk4/IynXD/src/GLib/signals.jl:83 [inlined]
- [11] g_siginterruptible(f::Gtk4.GLib.var"#GClosureMarshal##0#GClosureMarshal##1"{Ptr{Gtk4.GLib.GValue}, UInt32, Ptr{Gtk4.GLib.GValue}, Vector{Any}, ShannonSwitchingGame.var"#on_canvas_pressed#run_gui##56"{ShannonSwitchingGame.var"#computer_move!#run_gui##37"{ShannonSwitchingGame.var"#refresh!#run_gui##13"{ShannonSwitchingGame.var"#update_status!#run_gui##12"{ShannonSwitchingGame.var"#set_status!#run_gui##6"{Gtk4.GtkLabelLeaf}, ShannonSwitchingGame.var"#player_name#run_gui##5"{Base.RefValue{String}, Base.RefValue{String}}, ShannonSwitchingGame.var"#is_computer_turn#run_gui##3"{ShannonSwitchingGame.var"#computer_player#run_gui##2"{ShannonSwitchingGame.var"#human_player#run_gui##1"{Gtk4.GtkDropDownLeaf}}, ShannonSwitchingGame.var"#is_computer_game#run_gui##0"{Gtk4.GtkDropDownLeaf}}, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, ShannonSwitchingGame.var"#update_history!#run_gui##11"{ShannonSwitchingGame.var"#move_name#run_gui##10"{ShannonSwitchingGame.var"#edge_name#run_gui##9"{ShannonSwitchingGame.var"#vertex_name#run_gui##8"}, ShannonSwitchingGame.var"#player_name#run_gui##5"{Base.RefValue{String}, Base.RefValue{String}}}, Gtk4.GtkLabelLeaf, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, ShannonSwitchingGame.var"#update_turn_label!#run_gui##7"{ShannonSwitchingGame.var"#player_name#run_gui##5"{Base.RefValue{String}, Base.RefValue{String}}, Gtk4.GtkLabelLeaf, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, Gtk4.GtkCanvas}, ShannonSwitchingGame.var"#is_computer_turn#run_gui##3"{ShannonSwitchingGame.var"#computer_player#run_gui##2"{ShannonSwitchingGame.var"#human_player#run_gui##1"{Gtk4.GtkDropDownLeaf}}, ShannonSwitchingGame.var"#is_computer_game#run_gui##0"{Gtk4.GtkDropDownLeaf}}, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, ShannonSwitchingGame.var"#clicked_edge#run_gui##31"{ShannonSwitchingGame.var"#distance_to_drawn_edge#run_gui##30"{ShannonSwitchingGame.var"#distance_to_edge#run_gui##29", ShannonSwitchingGame.var"#point_on_curve#run_gui##28", ShannonSwitchingGame.var"#curve_control_point#run_gui##27"}, ShannonSwitchingGame.var"#visual_offset#run_gui##26", ShannonSwitchingGame.var"#parallel_offsets#run_gui##21"{ShannonSwitchingGame.var"#edge_key#run_gui##15"}, ShannonSwitchingGame.var"#all_known_edges#run_gui##16", ShannonSwitchingGame.var"#node_positions#run_gui##14", Gtk4.GtkCanvas}, ShannonSwitchingGame.var"#refresh!#run_gui##13"{ShannonSwitchingGame.var"#update_status!#run_gui##12"{ShannonSwitchingGame.var"#set_status!#run_gui##6"{Gtk4.GtkLabelLeaf}, ShannonSwitchingGame.var"#player_name#run_gui##5"{Base.RefValue{String}, Base.RefValue{String}}, ShannonSwitchingGame.var"#is_computer_turn#run_gui##3"{ShannonSwitchingGame.var"#computer_player#run_gui##2"{ShannonSwitchingGame.var"#human_player#run_gui##1"{Gtk4.GtkDropDownLeaf}}, ShannonSwitchingGame.var"#is_computer_game#run_gui##0"{Gtk4.GtkDropDownLeaf}}, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, ShannonSwitchingGame.var"#update_history!#run_gui##11"{ShannonSwitchingGame.var"#move_name#run_gui##10"{ShannonSwitchingGame.var"#edge_name#run_gui##9"{ShannonSwitchingGame.var"#vertex_name#run_gui##8"}, ShannonSwitchingGame.var"#player_name#run_gui##5"{Base.RefValue{String}, Base.RefValue{String}}}, Gtk4.GtkLabelLeaf, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, ShannonSwitchingGame.var"#update_turn_label!#run_gui##7"{ShannonSwitchingGame.var"#player_name#run_gui##5"{Base.RefValue{String}, Base.RefValue{String}}, Gtk4.GtkLabelLeaf, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}, Gtk4.GtkCanvas}, ShannonSwitchingGame.var"#is_computer_turn#run_gui##3"{ShannonSwitchingGame.var"#computer_player#run_gui##2"{ShannonSwitchingGame.var"#human_player#run_gui##1"{Gtk4.GtkDropDownLeaf}}, ShannonSwitchingGame.var"#is_computer_game#run_gui##0"{Gtk4.GtkDropDownLeaf}}, Base.RefValue{Union{Nothing, ShannonSwitchingGame.GameState}}}}, cb::Any)
-    @ Gtk4.GLib ~/.julia/packages/Gtk4/IynXD/src/GLib/signals.jl:264
- [12] GClosureMarshal(closuref::Ptr{Nothing}, return_value::Ptr{Gtk4.GLib.GValue}, n_param_values::UInt32, param_values::Ptr{Gtk4.GLib.GValue}, invocation_hint::Ptr{Nothing}, marshal_data::Ptr{Nothing})
-    @ Gtk4.GLib ~/.julia/packages/Gtk4/IynXD/src/GLib/signals.jl:77
- [13] iterate_loop
-    @ ~/.julia/packages/Gtk4/IynXD/src/GLib/loop.jl:85 [inlined]
- [14] (::Base.var"#634#635"{typeof(Gtk4.GLib.iterate_loop), Timer})()
-    @ Base ./asyncevent.jl:361
-=#

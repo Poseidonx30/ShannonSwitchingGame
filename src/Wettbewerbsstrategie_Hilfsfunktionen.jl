@@ -1,4 +1,7 @@
 #unsere alten Funktionen optimiert und an die neue Datenstruktur für Zusammenhangskomponenten angepasst - in Zusammenarbeit mit Gemini :)
+
+const punishment = 100.0
+
 struct ComponentTracker
     parent::Vector{Int}
     size::Vector{Int}
@@ -240,13 +243,13 @@ function who_can_win(g::ExtendedGameState, minimal::Bool)
     g.B = T2_edges
     if e1 ∈ T2_edges || e2 ∈ T1_edges 
         g.has_winning_strategy = :cut
-        println(:cut)
+        #println(:cut)
     elseif e1 ∈ T1_edges 
         g.has_winning_strategy = g.current_player
-        println(g.current_player)
+        #println(g.current_player)
     else
         g.has_winning_strategy = :short
-        println(:short)
+        #println(:short)
     end
 end
 
@@ -286,8 +289,8 @@ function chase(g::ExtendedGameState, state::GameState)::Edge
             end
         end
         if next_move === nothing 
-            println("das sollte nicht passieren")
-            return rand(valid_moves(state)) #MCTS
+            error("das sollte nicht passieren")
+            #return rand(valid_moves(state)) 
         end
     else 
         fc_last = FC(last_move, T_strich, g.merged_graph.components)
@@ -298,8 +301,8 @@ function chase(g::ExtendedGameState, state::GameState)::Edge
             end
         end
         if isempty(next_moves) #das darf eigentlich nicht passieren
-            println("das sollte nicht passieren")
-            return rand(valid_moves(state)) #MCTS 
+            error("das sollte nicht passieren")
+            #return rand(valid_moves(state)) 
         end
         next_move = first(next_moves)
         for e in next_moves
@@ -459,4 +462,210 @@ println("Benchmark startet. Das kann einen Moment dauern...")
 # 3. Dijkstra benchmarken
 @btime dijkstra($g, $g.s, $g.t) =#
 
-#########################################################################ALTER CODE###########################################################
+#########################################################################BENCHMARK SPIELE###########################################################
+using Statistics
+
+const OUTFILE = "benchmark.txt"
+const ERRORFILE = "errors.txt"
+
+# Dateien initialisieren
+open(OUTFILE, "w") do io
+    println(io, "Benchmark gestartet\n")
+end
+
+open(ERRORFILE, "w") do io
+    println(io, "Fehlerlog gestartet\n")
+end
+function test()
+    computer_wins = 0
+    random_wins = 0
+
+    computer_points_sum = 0.0
+    random_points_sum = 0.0
+
+    global_max_move_time = 0.0
+
+    i = 0
+    while i ≤ 5
+        i += 1
+
+        n = rand(4:500)
+        m = rand(n:min(2n, n*(n-1)÷2))
+
+        g = random_graph(n, m, weighted = true)
+
+        had_error = false
+
+        ####################################################
+        # Random vs Computer (weighted_cut)
+        ####################################################
+
+        game = new_game(g)
+
+        move_times_cut = Float64[]
+        timeout = false
+
+        len = length(valid_moves(game))
+
+        while len ≥ 1
+            make_move!(game, rand(valid_moves(game)))
+            len -= 1
+
+            if len ≥ 1
+                try
+                    t1 = time_ns()
+                    make_move!(game, weighted_cut(game))
+                    t2 = time_ns()
+
+                    dt = (t2 - t1) / 1e6
+                    push!(move_times_cut, dt)
+
+                    if dt > 2000
+                        timeout = true
+                    end
+
+                catch e
+                    had_error = true
+                    open(ERRORFILE, "a") do io
+                        println(io, "ERROR in weighted_cut (Spiel $i)")
+                        println(io, "n=$n, m=$m")
+                        println(io, e)
+                        println(io)
+                    end
+                end
+
+                len -= 1
+            end
+        end
+
+        points_random = dijkstra(
+            game.short_Graph,
+            game.short_Graph.s,
+            game.short_Graph.t
+        )
+
+        ####################################################
+        # Computer vs Random (weighted_short)
+        ####################################################
+
+        game = new_game(g)
+
+        move_times_short = Float64[]
+
+        len = length(valid_moves(game))
+
+        while len ≥ 1
+            try
+                t1 = time_ns()
+                make_move!(game, weighted_short(game))
+                t2 = time_ns()
+
+                dt = (t2 - t1) / 1e6
+                push!(move_times_short, dt)
+
+                if dt > 2000
+                    timeout = true
+                end
+
+            catch e
+                had_error = true
+                open(ERRORFILE, "a") do io
+                    println(io, "ERROR in weighted_short (Spiel $i)")
+                    println(io, "n=$n, m=$m")
+                    println(io, e)
+                    println(io)
+                end
+            end
+
+            len -= 1
+
+            if len ≥ 1
+                make_move!(game, rand(valid_moves(game)))
+                len -= 1
+            end
+        end
+
+        points_computer = dijkstra(
+            game.short_Graph,
+            game.short_Graph.s,
+            game.short_Graph.t
+        )
+
+        ####################################################
+        # Statistik
+        ####################################################
+
+        if points_computer < points_random
+            winner = "Computer"
+            computer_wins += 1
+        else
+            winner = "Random"
+            random_wins += 1
+        end
+
+        computer_points_sum += points_computer
+        random_points_sum += points_random
+
+        mean_cut = isempty(move_times_cut) ? 0.0 : mean(move_times_cut)
+        max_cut  = isempty(move_times_cut) ? 0.0 : maximum(move_times_cut)
+
+        mean_short = isempty(move_times_short) ? 0.0 : mean(move_times_short)
+        max_short  = isempty(move_times_short) ? 0.0 : maximum(move_times_short)
+
+        global_max_move_time = max(global_max_move_time, max(max_cut, max_short))
+
+        ####################################################
+        # Benchmark Output
+        ####################################################
+
+        open(OUTFILE, "a") do io
+            println(io, "========================================")
+            println(io, "Spiel $i")
+            println(io, "Graph: n=$n, m=$m")
+            println(io)
+            println(io, "Gewinner: $winner")
+            println(io)
+            println(io, "Punkte Computer: $points_computer")
+            println(io, "Punkte Random:   $points_random")
+            println(io)
+
+            println(io, "weighted_cut:")
+            println(io, "  mean: $(round(mean_cut, digits=2)) ms")
+            println(io, "  max:  $(round(max_cut, digits=2)) ms")
+            println(io)
+
+            println(io, "weighted_short:")
+            println(io, "  mean: $(round(mean_short, digits=2)) ms")
+            println(io, "  max:  $(round(max_short, digits=2)) ms")
+            println(io)
+
+            println(io, "Fehler aufgetreten: $had_error")
+            println(io)
+        end
+
+        ####################################################
+        # Zwischenstand
+        ####################################################
+
+        if i % 60 == 0
+            avg_comp = computer_points_sum / i
+            avg_rand = random_points_sum / i
+
+            open(OUTFILE, "a") do io
+                println(io, "########################################")
+                println(io, "Zwischenstand nach $i Spielen")
+                println(io)
+                println(io, "Computer-Siege: $computer_wins")
+                println(io, "Random-Siege:   $random_wins")
+                println(io)
+                println(io, "Ø Computerpunkte: $(round(avg_comp, digits=2))")
+                println(io, "Ø Randompunkte:   $(round(avg_rand, digits=2))")
+                println(io)
+                println(io, "Max. Zugzeit bisher: $(round(global_max_move_time, digits=2)) ms")
+                println(io, "########################################")
+                println(io)
+            end
+        end
+    end
+end
+test()
