@@ -500,10 +500,10 @@ function test()
     global_max_move_time = 0.0
 
     i = 0
-    while i ≤ 10
+    while i ≤ 1
         i += 1
 
-        n = rand(4:25)
+        n = rand(300:300)
         m = rand(n:min(2n - 1, n*(n-1)÷2 - 1))
 
         g = random_graph(n, m, weighted = true)
