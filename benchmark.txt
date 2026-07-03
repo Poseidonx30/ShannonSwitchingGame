@@ -133,3 +133,79 @@ weighted_short:
 
 Fehler aufgetreten: false
 
+========================================
+Spiel 8
+Graph: n=24, m=39
+
+Gewinner: Computer
+
+Punkte Computer: 4.2
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 0.05 ms
+  max:  0.39 ms
+
+weighted_short:
+  mean: 1434.88 ms
+  max:  1569.37 ms
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 9
+Graph: n=21, m=37
+
+Gewinner: Computer
+
+Punkte Computer: 16.8
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 339.06 ms
+  max:  1603.35 ms
+
+weighted_short:
+  mean: 158.02 ms
+  max:  1501.4 ms
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 10
+Graph: n=25, m=48
+
+Gewinner: Computer
+
+Punkte Computer: 6.5
+Punkte Random:   15.5
+
+weighted_cut:
+  mean: 1127.55 ms
+  max:  1560.74 ms
+
+weighted_short:
+  mean: 500.24 ms
+  max:  1502.37 ms
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 11
+Graph: n=18, m=18
+
+Gewinner: Random
+
+Punkte Computer: 100.0
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 0.02 ms
+  max:  0.11 ms
+
+weighted_short:
+  mean: 1000.16 ms
+  max:  1502.73 ms
+
+Fehler aufgetreten: false
+
