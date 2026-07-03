@@ -53,6 +53,8 @@ Base.copy(ct::ComponentTracker)::ComponentTracker = ComponentTracker(copy(ct.par
 
 Base.copy(g::GameGraph)::GameGraph = GameGraph(copy(g.vertices), copy(g.edges), g.s, g.t)
 
+Base.copy(g::EfficientGameGraph)::EfficientGameGraph = EfficientGameGraph(copy(g.edges), copy(g.components), g.s, g.t)
+
 function d_copy(g::GameGraph)::GameGraph
     new_vertices = Vector{Vertex}()
     for vertex in g.vertices
@@ -496,10 +498,10 @@ function test()
     global_max_move_time = 0.0
 
     i = 0
-    while true
+    while i ≤ 15
         i += 1
 
-        n = rand(4:150)
+        n = rand(15:25)
         m = rand(n:min(2n - 1, n*(n-1)÷2 - 1))
 
         g = random_graph(n, m, weighted = true)

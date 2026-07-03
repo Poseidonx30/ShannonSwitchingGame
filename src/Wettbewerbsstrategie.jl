@@ -128,6 +128,7 @@ function MCTS(state::ExtendedGameState, orig_state::GameState; time_limit = 1.0)
     s_component = get_component!(state.merged_graph.components, state.merged_graph.s.id)
     t_component = get_component!(state.merged_graph.components, state.merged_graph.t.id)
     untried_actions_at_root = [edge for edge in state.merged_graph.edges if get_component!(state.merged_graph.components, edge.u.id) == s_component || get_component!(state.merged_graph.components, edge.v.id) == s_component || get_component!(state.merged_graph.components, edge.u.id) == t_component || get_component!(state.merged_graph.components, edge.v.id) == t_component]
+    #untried_actions_at_root = valid_moves(orig_state)
     if isempty(untried_actions_at_root)
         untried_actions_at_root = valid_moves(orig_state)
     end
@@ -171,7 +172,7 @@ end
                 found_node = true
                 break
             end 
-            C = 10.0
+            C = 10
             exploration = C * sqrt(2.0 * log_parent_visits / child.visits)
             exploitation = child.total_weight_at_end / child.visits
 
@@ -270,10 +271,11 @@ end
         delete!(short_merged_graph.edges, move)
     end
     deleteat!(untried_actions, findfirst(x -> x.id == move.id, untried_actions))
+    #= deleteat!(untried_actions, findfirst(x -> x.id == move.id, untried_actions))
     s_component = get_component!(short_merged_graph.components, short_merged_graph.s.id)
     t_component = get_component!(short_merged_graph.components, short_merged_graph.t.id)
     move_pos = findfirst(x -> x.id == move.id, untried_actions)
-    untried_actions = [edge for edge in state.merged_graph.edges if get_component!(short_merged_graph.components, untried_actions[move_pos].u.id) == s_component || get_component!(short_merged_graph.components, untried_actions[move_pos].v.id) == s_component || get_component!(short_merged_graph.components, untried_actions[move_pos].u.id) == t_component || get_component!(short_merged_graph.components, untried_actions[move_pos].v.id) == t_component]
+    untried_actions = [edge for edge in state.merged_graph.edges if get_component!(short_merged_graph.components, untried_actions[move_pos].u.id) == s_component || get_component!(short_merged_graph.components, untried_actions[move_pos].v.id) == s_component || get_component!(short_merged_graph.components, untried_actions[move_pos].u.id) == t_component || get_component!(short_merged_graph.components, untried_actions[move_pos].v.id) == t_component] =#
 end
 
 @inline function make_move!(short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge}, move_pos::Int, player::Symbol)
@@ -289,9 +291,10 @@ end
     else
         delete!(short_merged_graph.edges, untried_actions[move_pos])
     end
-    s_component = get_component!(short_merged_graph.components, short_merged_graph.s.id)
+    deleteat!(untried_actions, move_pos)
+    #= s_component = get_component!(short_merged_graph.components, short_merged_graph.s.id)
     t_component = get_component!(short_merged_graph.components, short_merged_graph.t.id)
-    untried_actions = [edge for edge in state.merged_graph.edges if get_component!(short_merged_graph.components, untried_actions[move_pos].u.id) == s_component || get_component!(short_merged_graph.components, untried_actions[move_pos].v.id) == s_component || get_component!(short_merged_graph.components, untried_actions[move_pos].u.id) == t_component || get_component!(short_merged_graph.components, untried_actions[move_pos].v.id) == t_component]
+    untried_actions = [edge for edge in state.merged_graph.edges if get_component!(short_merged_graph.components, untried_actions[move_pos].u.id) == s_component || get_component!(short_merged_graph.components, untried_actions[move_pos].v.id) == s_component || get_component!(short_merged_graph.components, untried_actions[move_pos].u.id) == t_component || get_component!(short_merged_graph.components, untried_actions[move_pos].v.id) == t_component] =#
 end
 
 #= @inline function undo_move!(short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge}, move::Edge, player::Symbol)
