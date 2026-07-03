@@ -124,7 +124,7 @@ end
 
 function MCTS(state::ExtendedGameState, orig_state::GameState; time_limit = 1.0)::Edge # state.graph muss die von short beanspruchten Kanten enthalten, WICHTIG: die Zusammenhangskomponenten von ComponentTracker müssen berichtigt werden, wenn der Anfangsgraph nicht-leer ist
     start_time = time()
-    root_node = MCTS_node(nothing, Vector{MCTS_node}(), 0.0, 0, :short, false, nothing)
+    root_node = MCTS_node(nothing, Vector{MCTS_node}(), 0.0, 0, orig_state.current_player, false, nothing)
     s_component = get_component!(state.merged_graph.components, state.merged_graph.s.id)
     t_component = get_component!(state.merged_graph.components, state.merged_graph.t.id)
     untried_actions_at_root = [edge for edge in state.merged_graph.edges if get_component!(state.merged_graph.components, edge.u.id) == s_component || get_component!(state.merged_graph.components, edge.v.id) == s_component || get_component!(state.merged_graph.components, edge.u.id) == t_component || get_component!(state.merged_graph.components, edge.v.id) == t_component]
