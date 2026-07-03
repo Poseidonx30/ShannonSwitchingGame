@@ -161,7 +161,7 @@ function MCTS(state::ExtendedGameState, orig_state::GameState; time_limit = 1.0)
     return max_child.last_move
 end 
 
-@inline function select(node::MCTS_node, short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge})::MCTS_node
+function select(node::MCTS_node, short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge})::MCTS_node
     current_node = node
     while !isempty(current_node.children)
         ucb = -Inf
@@ -195,7 +195,7 @@ end
     return current_node
 end
 
-@inline function expand!(node::MCTS_node, short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge})::Tuple{MCTS_node,Float64}
+function expand!(node::MCTS_node, short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge})::Tuple{MCTS_node,Float64}
     new_node = nothing
     terminal = false
     idx = rand(1:length(untried_actions))
@@ -240,7 +240,7 @@ end
     return (new_node,-1)
 end
 
-@inline function simulate!(node::MCTS_node, short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge})::Float64 # gibt das minimale Gewicht eines s-t-Weges zurück
+function simulate!(node::MCTS_node, short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge})::Float64 # gibt das minimale Gewicht eines s-t-Weges zurück
     current_player = node.current_player
     while !isempty(untried_actions)
         idx = rand(1:length(untried_actions))
@@ -253,7 +253,7 @@ end
     return dijkstra(short_graph, short_graph.s, short_graph.t)
 end
 
-@inline function backpropagate!(node::MCTS_node, weight_at_end::Float64)
+function backpropagate!(node::MCTS_node, weight_at_end::Float64)
     current_node = node
     while !isnothing(current_node) # wird immer mit mindestens Kindknoten von root aufgerufen
         current_node.total_weight_at_end += weight_at_end
@@ -261,7 +261,7 @@ end
     end
 end
 
-@inline function make_move!(short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge}, move::Edge, player::Symbol)
+function make_move!(short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge}, move::Edge, player::Symbol)
     if player == :short
         push!(short_graph.edges, move)
         if move.u ∉ short_graph.vertices
@@ -290,7 +290,7 @@ end
     end
 end
 
-@inline function make_move!(short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge}, move_pos::Int, player::Symbol)
+function make_move!(short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge}, move_pos::Int, player::Symbol)
     if player == :short
         push!(short_graph.edges, untried_actions[move_pos])
         if untried_actions[move_pos].u ∉ short_graph.vertices

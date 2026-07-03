@@ -529,7 +529,8 @@ function test()
             if len ≥ 1
                 try
                     t1 = time_ns()
-                    mem = @ballocated make_move!(game, weighted_cut(game))
+                    # Korrektur: Base.@allocated statt @ballocated
+                    mem = @allocated make_move!(game, weighted_cut(game))
                     t2 = time_ns()
 
                     dt = (t2 - t1) / 1e6
@@ -578,7 +579,8 @@ function test()
         while len ≥ 1
             try
                 t1 = time_ns()
-                mem = @ballocated make_move!(game, weighted_short(game))
+                # Korrektur: Base.@allocated statt @ballocated
+                mem = @allocated make_move!(game, weighted_short(game))
                 t2 = time_ns()
 
                 dt = (t2 - t1) / 1e6
@@ -636,6 +638,10 @@ function test()
 
         mean_short = isempty(move_times_short) ? 0.0 : mean(move_times_short)
         max_short  = isempty(move_times_short) ? 0.0 : maximum(move_times_short)
+        
+        # Sichern gegen ArgumentError, wenn die Arrays leer sind (z.B. durch frühe Fehler)
+        mean_mem_cut = isempty(cut_memory) ? 0.0 : mean(cut_memory)
+        mean_mem_short = isempty(memory_short) ? 0.0 : mean(memory_short)
 
         global_max_move_time = max(global_max_move_time, max(max_cut, max_short))
 
@@ -664,8 +670,9 @@ function test()
             println(io, "  max:  $(round(max_short, digits=2)) ms")
             println(io)
 
-            println(io, "Verbrauchter Heap-Speicher (cut): ", round(mean(cut_memory), digits=2)*1e-3, " KB.")
-            println(io, "Verbrauchter Heap-Speicher (short): ", round(mean(memory_short), digits=2)*1e-3, " KB.")
+            # Korrektur der RAM-Ausgabe, damit sie robuster ist
+            println(io, "Verbrauchter Heap-Speicher (cut): ", round(mean_mem_cut * 1e-3, digits=2), " KB.")
+            println(io, "Verbrauchter Heap-Speicher (short): ", round(mean_mem_short * 1e-3, digits=2), " KB.")
             println(io)
 
             println(io, "Fehler aufgetreten: $had_error")

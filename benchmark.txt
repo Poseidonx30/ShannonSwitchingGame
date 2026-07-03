@@ -1,305 +1,52 @@
+Benchmark gestartet
+
 ========================================
 Spiel 1
-Graph: n=23, m=37
+Graph: n=18, m=18
 
-Gewinner: Random
+Gewinner: Computer
 
-Punkte Computer: 100.0
+Punkte Computer: 36.699999999999996
 Punkte Random:   100.0
 
 weighted_cut:
-  mean: 0.0 ms
-  max:  0.0 ms
+  mean: 0.02 ms
+  max:  0.12 ms
 
 weighted_short:
-  mean: 0.0 ms
-  max:  0.0 ms
+  mean: 1333.25 ms
+  max:  1500.67 ms
 
-Verbrauchter Heap-Speicher (cut): NaN KB.
-Verbrauchter Heap-Speicher (short): NaN KB.
+Verbrauchter Heap-Speicher (cut): 11.43 KB.
+Verbrauchter Heap-Speicher (short): 1.42842007e6 KB.
 
-Fehler aufgetreten: true
+Fehler aufgetreten: false
 
 ========================================
 Spiel 2
-Graph: n=14, m=14
+Graph: n=8, m=12
 
-Gewinner: Random
+Gewinner: Computer
 
-Punkte Computer: 100.0
+Punkte Computer: 13.3
 Punkte Random:   100.0
 
 weighted_cut:
-  mean: 0.0 ms
-  max:  0.0 ms
+  mean: 0.02 ms
+  max:  0.06 ms
 
 weighted_short:
-  mean: 0.0 ms
-  max:  0.0 ms
+  mean: 1249.9 ms
+  max:  1500.45 ms
 
-Verbrauchter Heap-Speicher (cut): NaN KB.
-Verbrauchter Heap-Speicher (short): NaN KB.
+Verbrauchter Heap-Speicher (cut): 12.95 KB.
+Verbrauchter Heap-Speicher (short): 1.30323033e6 KB.
 
-Fehler aufgetreten: true
+Fehler aufgetreten: false
 
 ========================================
 Spiel 3
-Graph: n=22, m=43
-
-Gewinner: Random
-
-Punkte Computer: 10.1
-Punkte Random:   10.1
-
-weighted_cut:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-weighted_short:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-Verbrauchter Heap-Speicher (cut): NaN KB.
-Verbrauchter Heap-Speicher (short): NaN KB.
-
-Fehler aufgetreten: true
-
-========================================
-Spiel 4
-Graph: n=17, m=20
-
-Gewinner: Random
-
-Punkte Computer: 100.0
-Punkte Random:   100.0
-
-weighted_cut:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-weighted_short:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-Verbrauchter Heap-Speicher (cut): NaN KB.
-Verbrauchter Heap-Speicher (short): NaN KB.
-
-Fehler aufgetreten: true
-
-========================================
-Spiel 5
-Graph: n=14, m=14
-
-Gewinner: Random
-
-Punkte Computer: 100.0
-Punkte Random:   100.0
-
-weighted_cut:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-weighted_short:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-Verbrauchter Heap-Speicher (cut): NaN KB.
-Verbrauchter Heap-Speicher (short): NaN KB.
-
-Fehler aufgetreten: true
-
-========================================
-Spiel 6
-Graph: n=13, m=24
-
-Gewinner: Random
-
-Punkte Computer: 100.0
-Punkte Random:   12.7
-
-weighted_cut:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-weighted_short:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-Verbrauchter Heap-Speicher (cut): NaN KB.
-Verbrauchter Heap-Speicher (short): NaN KB.
-
-Fehler aufgetreten: true
-
-========================================
-Spiel 7
-Graph: n=8, m=15
-
-Gewinner: Computer
-
-Punkte Computer: 19.0
-Punkte Random:   100.0
-
-weighted_cut:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-weighted_short:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-Verbrauchter Heap-Speicher (cut): NaN KB.
-Verbrauchter Heap-Speicher (short): NaN KB.
-
-Fehler aufgetreten: true
-
-========================================
-Spiel 8
-Graph: n=17, m=17
-
-Gewinner: Random
-
-Punkte Computer: 100.0
-Punkte Random:   100.0
-
-weighted_cut:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-weighted_short:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-Verbrauchter Heap-Speicher (cut): NaN KB.
-Verbrauchter Heap-Speicher (short): NaN KB.
-
-Fehler aufgetreten: true
-
-========================================
-Spiel 9
-Graph: n=5, m=6
-
-Gewinner: Random
-
-Punkte Computer: 100.0
-Punkte Random:   100.0
-
-weighted_cut:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-weighted_short:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-Verbrauchter Heap-Speicher (cut): NaN KB.
-Verbrauchter Heap-Speicher (short): NaN KB.
-
-Fehler aufgetreten: true
-
-========================================
-Spiel 10
-Graph: n=5, m=6
-
-Gewinner: Random
-
-Punkte Computer: 100.0
-Punkte Random:   100.0
-
-weighted_cut:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-weighted_short:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-Verbrauchter Heap-Speicher (cut): NaN KB.
-Verbrauchter Heap-Speicher (short): NaN KB.
-
-Fehler aufgetreten: true
-
-========================================
-Spiel 11
-Graph: n=16, m=31
-
-Gewinner: Random
-
-Punkte Computer: 100.0
-Punkte Random:   100.0
-
-weighted_cut:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-weighted_short:
-  mean: 0.0 ms
-  max:  0.0 ms
-
-Verbrauchter Heap-Speicher (cut): NaN KB.
-Verbrauchter Heap-Speicher (short): NaN KB.
-
-Fehler aufgetreten: true
-
-========================================
-Spiel 8
-Graph: n=24, m=39
-
-Gewinner: Computer
-
-Punkte Computer: 4.2
-Punkte Random:   100.0
-
-weighted_cut:
-  mean: 0.05 ms
-  max:  0.39 ms
-
-weighted_short:
-  mean: 1434.88 ms
-  max:  1569.37 ms
-
-Fehler aufgetreten: false
-
-========================================
-Spiel 9
-Graph: n=21, m=37
-
-Gewinner: Computer
-
-Punkte Computer: 16.8
-Punkte Random:   100.0
-
-weighted_cut:
-  mean: 339.06 ms
-  max:  1603.35 ms
-
-weighted_short:
-  mean: 158.02 ms
-  max:  1501.4 ms
-
-Fehler aufgetreten: false
-
-========================================
-Spiel 10
-Graph: n=25, m=48
-
-Gewinner: Computer
-
-Punkte Computer: 6.5
-Punkte Random:   15.5
-
-weighted_cut:
-  mean: 1127.55 ms
-  max:  1560.74 ms
-
-weighted_short:
-  mean: 500.24 ms
-  max:  1502.37 ms
-
-Fehler aufgetreten: false
-
-========================================
-Spiel 11
-Graph: n=18, m=18
+Graph: n=9, m=11
 
 Gewinner: Random
 
@@ -308,11 +55,190 @@ Punkte Random:   100.0
 
 weighted_cut:
   mean: 0.02 ms
-  max:  0.11 ms
+  max:  0.04 ms
 
 weighted_short:
-  mean: 1000.16 ms
-  max:  1502.73 ms
+  mean: 999.89 ms
+  max:  1500.29 ms
+
+Verbrauchter Heap-Speicher (cut): 15.89 KB.
+Verbrauchter Heap-Speicher (short): 720821.22 KB.
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 4
+Graph: n=20, m=22
+
+Gewinner: Random
+
+Punkte Computer: 100.0
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 0.02 ms
+  max:  0.1 ms
+
+weighted_short:
+  mean: 1091.95 ms
+  max:  1512.45 ms
+
+Verbrauchter Heap-Speicher (cut): 19.38 KB.
+Verbrauchter Heap-Speicher (short): 754697.48 KB.
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 5
+Graph: n=19, m=31
+
+Gewinner: Computer
+
+Punkte Computer: 15.2
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 400.04 ms
+  max:  1500.54 ms
+
+weighted_short:
+  mean: 375.07 ms
+  max:  1502.3 ms
+
+Verbrauchter Heap-Speicher (cut): 142109.88 KB.
+Verbrauchter Heap-Speicher (short): 710179.7 KB.
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 6
+Graph: n=5, m=8
+
+Gewinner: Computer
+
+Punkte Computer: 14.2
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 374.91 ms
+  max:  1499.63 ms
+
+weighted_short:
+  mean: 0.01 ms
+  max:  0.02 ms
+
+Verbrauchter Heap-Speicher (cut): 309671.16 KB.
+Verbrauchter Heap-Speicher (short): 12.77 KB.
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 7
+Graph: n=9, m=13
+
+Gewinner: Computer
+
+Punkte Computer: 11.8
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 0.02 ms
+  max:  0.09 ms
+
+weighted_short:
+  mean: 1286.45 ms
+  max:  1506.61 ms
+
+Verbrauchter Heap-Speicher (cut): 14.59 KB.
+Verbrauchter Heap-Speicher (short): 1.32502042e6 KB.
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 8
+Graph: n=23, m=30
+
+Gewinner: Computer
+
+Punkte Computer: 10.2
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 0.04 ms
+  max:  0.21 ms
+
+weighted_short:
+  mean: 1399.96 ms
+  max:  1500.47 ms
+
+Verbrauchter Heap-Speicher (cut): 28.61 KB.
+Verbrauchter Heap-Speicher (short): 1.40174307e6 KB.
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 9
+Graph: n=11, m=20
+
+Gewinner: Computer
+
+Punkte Computer: 9.9
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 750.45 ms
+  max:  1504.87 ms
+
+weighted_short:
+  mean: 149.92 ms
+  max:  1499.07 ms
+
+Verbrauchter Heap-Speicher (cut): 373400.38 KB.
+Verbrauchter Heap-Speicher (short): 298179.11 KB.
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 10
+Graph: n=17, m=20
+
+Gewinner: Computer
+
+Punkte Computer: 13.9
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 0.01 ms
+  max:  0.08 ms
+
+weighted_short:
+  mean: 1350.12 ms
+  max:  1502.24 ms
+
+Verbrauchter Heap-Speicher (cut): 18.83 KB.
+Verbrauchter Heap-Speicher (short): 1.37547955e6 KB.
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 11
+Graph: n=12, m=20
+
+Gewinner: Computer
+
+Punkte Computer: 5.0
+Punkte Random:   100.0
+
+weighted_cut:
+  mean: 300.0 ms
+  max:  1500.62 ms
+
+weighted_short:
+  mean: 1201.49 ms
+  max:  1500.63 ms
+
+Verbrauchter Heap-Speicher (cut): 126758.73 KB.
+Verbrauchter Heap-Speicher (short): 1.31960106e6 KB.
 
 Fehler aufgetreten: false
 
