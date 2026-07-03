@@ -73,14 +73,15 @@ function weighted_short(state::GameState)::Edge
     if len !=0
         delete!(merged_graph.edges, state.history[end][2])   #######
     end
-    if len != 0 && EXTENDED_STATE[].winner != :cut  
+    if len != 0 && isnothing(EXTENDED_STATE[].winner)
         EXTENDED_STATE[].winner = (check_st_connection(EXTENDED_STATE[].merged_graph) == false) ? :cut : nothing
     end
     if EXTENDED_STATE[].winner == :cut  
         return rand(valid_moves(state))
     end
     if EXTENDED_STATE[].winner == :short
-        shorts_edge = MCTS(EXTENDED_STATE[], state)
+        end_time = time()
+        shorts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.5 - (end_time - start_time))
     elseif EXTENDED_STATE[].has_winning_strategy == :short
         shorts_edge = chase(EXTENDED_STATE[], state)
     else
@@ -140,7 +141,7 @@ function MCTS(state::ExtendedGameState, orig_state::GameState; time_limit = 1.0)
         root_node.visits += 1
         node = select(root_node, short_graph, short_merged_graph, untried_actions)
         if node.terminal
-            backpropagate!(node, node.total_weight_at_end / node.visits)
+            backpropagate!(node, node.total_weight_at_end / (node.visits - 1))
             continue
         end
         node = expand!(node, short_graph, short_merged_graph, untried_actions)
@@ -165,12 +166,13 @@ end
         is_short = current_node.current_player == :short
         for child in current_node.children
             if child.visits == 0 # nur wichtig, wenn wir in einem Schritt mehrere Knoten expanden
-                current_node = child
                 make_move!(short_graph, short_merged_graph, untried_actions, child.last_move, current_node.current_player)
+                current_node = child
                 found_node = true
                 break
             end 
-            exploration = sqrt(2.0 * log_parent_visits / child.visits)
+            C = 10.0
+            exploration = C * sqrt(2.0 * log_parent_visits / child.visits)
             exploitation = child.total_weight_at_end / child.visits
 
             val = is_short ? -exploitation + exploration : exploitation + exploration
@@ -180,8 +182,8 @@ end
             end
         end
         if !found_node
-            current_node = max_child
             make_move!(short_graph, short_merged_graph, untried_actions, max_child.last_move, current_node.current_player)
+            current_node = max_child
         end
         current_node.visits += 1
     end
@@ -248,7 +250,7 @@ end
 
 @inline function backpropagate!(node::MCTS_node, weight_at_end::Float64)
     current_node = node
-    while !isnothing(current_node.parent) # wird immer mit mindestens Kindknoten von root aufgerufen
+    while !isnothing(current_node) # wird immer mit mindestens Kindknoten von root aufgerufen
         current_node.total_weight_at_end += weight_at_end
         current_node = current_node.parent
     end

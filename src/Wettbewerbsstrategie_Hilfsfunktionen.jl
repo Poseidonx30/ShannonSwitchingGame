@@ -53,7 +53,17 @@ Base.copy(ct::ComponentTracker)::ComponentTracker = ComponentTracker(copy(ct.par
 
 Base.copy(g::GameGraph)::GameGraph = GameGraph(copy(g.vertices), copy(g.edges), g.s, g.t)
 
-Base.copy(g::EfficientGameGraph)::EfficientGameGraph = EfficientGameGraph(copy(g.edges), copy(g.components), g.s, g.t)
+function d_copy(g::GameGraph)::GameGraph
+    new_vertices = Vector{Vertex}()
+    for vertex in g.vertices
+        push!(new_vertices, Vertex(vertex.id))
+    end
+    new_edges = Vector{Edge}()
+    for edge in g.edges
+        push!(new_edges, Edge(edge.id, new_vertices[findfirst(x->x.id == edge.u.id, new_vertices)], new_vertices[findfirst(x->x.id == edge.v.id, new_vertices)], edge.weight, edge.state))
+    end
+    return GameGraph(new_vertices, new_edges, g.s, g.t)
+end
 
 function _find_idx!(ct::ComponentTracker, idx::Int)::Int
     if ct.parent[idx] == idx
@@ -486,11 +496,11 @@ function test()
     global_max_move_time = 0.0
 
     i = 0
-    while i ≤ 5
+    while i ≤ 2
         i += 1
 
-        n = rand(4:500)
-        m = rand(n:min(2n, n*(n-1)÷2))
+        n = rand(400:500)
+        m = rand(n:min(2n - 1, n*(n-1)÷2 - 1))
 
         g = random_graph(n, m, weighted = true)
 
@@ -500,7 +510,7 @@ function test()
         # Random vs Computer (weighted_cut)
         ####################################################
 
-        game = new_game(g)
+        game = new_game(d_copy(g))
 
         move_times_cut = Float64[]
         timeout = false
@@ -529,9 +539,10 @@ function test()
                     open(ERRORFILE, "a") do io
                         println(io, "ERROR in weighted_cut (Spiel $i)")
                         println(io, "n=$n, m=$m")
-                        println(io, e)
+                        showerror(io, e)
                         println(io)
-                    end
+                        println(io)
+                    end 
                 end
 
                 len -= 1
@@ -548,12 +559,12 @@ function test()
         # Computer vs Random (weighted_short)
         ####################################################
 
-        game = new_game(g)
+        game = new_game(d_copy(g))
 
         move_times_short = Float64[]
 
         len = length(valid_moves(game))
-
+    
         while len ≥ 1
             try
                 t1 = time_ns()
@@ -574,7 +585,7 @@ function test()
                     println(io, "n=$n, m=$m")
                     println(io, e)
                     println(io)
-                end
+                end 
             end
 
             len -= 1
@@ -666,6 +677,7 @@ function test()
                 println(io)
             end
         end
+        println(i)
     end
 end
 test()
