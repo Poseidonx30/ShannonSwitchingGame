@@ -1,6 +1,8 @@
+using BenchmarkTools
+
 #unsere alten Funktionen optimiert und an die neue Datenstruktur für Zusammenhangskomponenten angepasst - in Zusammenarbeit mit Gemini :)
 
-const punishment = 500.0
+const punishment = 100.0
 
 struct ComponentTracker
     parent::Vector{Int}
@@ -443,7 +445,6 @@ function dijkstra(g::GameGraph, s::Vertex, t::Vertex)::Float64
     return punishment
 end
  
-# using BenchmarkTools
 #####################################################################TEST FÜR MINHEAP###############################################
 #= println("Generiere Testdaten...")
 N = 10_000  # Anzahl der Elemente im Heap
@@ -516,6 +517,7 @@ function test()
         game = new_game(d_copy(g))
 
         move_times_cut = Float64[]
+        cut_memory = Int128[]
         timeout = false
 
         len = length(valid_moves(game))
@@ -527,11 +529,12 @@ function test()
             if len ≥ 1
                 try
                     t1 = time_ns()
-                    make_move!(game, weighted_cut(game))
+                    mem = @ballocated make_move!(game, weighted_cut(game))
                     t2 = time_ns()
 
                     dt = (t2 - t1) / 1e6
                     push!(move_times_cut, dt)
+                    push!(cut_memory, mem)
 
                     if dt > 2000
                         timeout = true
@@ -568,17 +571,19 @@ function test()
         game = new_game(d_copy(g))
 
         move_times_short = Float64[]
+        memory_short = Int128[]
 
         len = length(valid_moves(game))
     
         while len ≥ 1
             try
                 t1 = time_ns()
-                make_move!(game, weighted_short(game))
+                mem = @ballocated make_move!(game, weighted_short(game))
                 t2 = time_ns()
 
                 dt = (t2 - t1) / 1e6
                 push!(move_times_short, dt)
+                push!(memory_short, mem)
 
                 if dt > 2000
                     timeout = true
@@ -657,6 +662,10 @@ function test()
             println(io, "weighted_short:")
             println(io, "  mean: $(round(mean_short, digits=2)) ms")
             println(io, "  max:  $(round(max_short, digits=2)) ms")
+            println(io)
+
+            println(io, "Verbrauchter Heap-Speicher (cut): ", round(mean(cut_memory), digits=2)*1e-3, " KB.")
+            println(io, "Verbrauchter Heap-Speicher (short): ", round(mean(memory_short), digits=2)*1e-3, " KB.")
             println(io)
 
             println(io, "Fehler aufgetreten: $had_error")
