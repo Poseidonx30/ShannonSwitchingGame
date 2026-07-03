@@ -1,6 +1,6 @@
 #unsere alten Funktionen optimiert und an die neue Datenstruktur für Zusammenhangskomponenten angepasst - in Zusammenarbeit mit Gemini :)
 
-const punishment = 100.0
+const punishment = 500.0
 
 struct ComponentTracker
     parent::Vector{Int}
@@ -488,6 +488,7 @@ end
 open(ERRORFILE, "w") do io
     println(io, "Fehlerlog gestartet\n")
 end
+
 function test()
     computer_wins = 0
     random_wins = 0
@@ -498,10 +499,10 @@ function test()
     global_max_move_time = 0.0
 
     i = 0
-    while i ≤ 15
+    while i ≤ 10
         i += 1
 
-        n = rand(15:25)
+        n = rand(4:25)
         m = rand(n:min(2n - 1, n*(n-1)÷2 - 1))
 
         g = random_graph(n, m, weighted = true)
@@ -541,7 +542,10 @@ function test()
                     open(ERRORFILE, "a") do io
                         println(io, "ERROR in weighted_cut (Spiel $i)")
                         println(io, "n=$n, m=$m")
-                        showerror(io, e)
+                        for (exc, bt) in current_exceptions()
+                            showerror(io, exc, bt)
+                            println(io)
+                        end
                         println(io)
                         println(io)
                     end 
@@ -585,7 +589,10 @@ function test()
                 open(ERRORFILE, "a") do io
                     println(io, "ERROR in weighted_short (Spiel $i)")
                     println(io, "n=$n, m=$m")
-                    println(io, e)
+                    for (exc, bt) in current_exceptions()
+                        showerror(io, exc, bt)
+                        println(io)
+                    end
                     println(io)
                 end 
             end
@@ -679,7 +686,5 @@ function test()
                 println(io)
             end
         end
-        println(i)
     end
 end
-test()
