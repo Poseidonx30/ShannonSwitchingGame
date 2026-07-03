@@ -1,0 +1,211 @@
+Benchmark gestartet
+
+========================================
+Spiel 1
+Graph: n=11, m=12
+
+Gewinner: Computer
+
+Punkte Computer: 14.899999999999999
+Punkte Random:   500.0
+
+weighted_cut:
+  mean: 0.01 ms
+  max:  0.03 ms
+
+weighted_short:
+  mean: 1250.03 ms
+  max:  1500.12 ms
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 2
+Graph: n=6, m=6
+
+Gewinner: Random
+
+Punkte Computer: 500.0
+Punkte Random:   500.0
+
+weighted_cut:
+  mean: 0.01 ms
+  max:  0.03 ms
+
+weighted_short:
+  mean: 1000.0 ms
+  max:  1500.0 ms
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 3
+Graph: n=4, m=5
+
+Gewinner: Computer
+
+Punkte Computer: 17.1
+Punkte Random:   17.7
+
+weighted_cut:
+  mean: 1500.0 ms
+  max:  1500.0 ms
+
+weighted_short:
+  mean: 0.01 ms
+  max:  0.02 ms
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 4
+Graph: n=11, m=21
+
+Gewinner: Computer
+
+Punkte Computer: 11.600000000000001
+Punkte Random:   500.0
+
+weighted_cut:
+  mean: 1050.01 ms
+  max:  1500.01 ms
+
+weighted_short:
+  mean: 681.83 ms
+  max:  1500.01 ms
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 5
+Graph: n=18, m=33
+
+Gewinner: Computer
+
+Punkte Computer: 11.5
+Punkte Random:   12.1
+
+weighted_cut:
+  mean: 468.76 ms
+  max:  1500.03 ms
+
+weighted_short:
+  mean: 176.48 ms
+  max:  1500.0 ms
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 6
+Graph: n=6, m=7
+
+Gewinner: Computer
+
+Punkte Computer: 9.100000000000001
+Punkte Random:   500.0
+
+weighted_cut:
+  mean: 0.01 ms
+  max:  0.03 ms
+
+weighted_short:
+  mean: 1125.01 ms
+  max:  1500.01 ms
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 7
+Graph: n=5, m=8
+
+Gewinner: Computer
+
+Punkte Computer: 16.4
+Punkte Random:   500.0
+
+weighted_cut:
+  mean: 1125.17 ms
+  max:  1500.68 ms
+
+weighted_short:
+  mean: 375.01 ms
+  max:  1500.0 ms
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 8
+Graph: n=24, m=25
+
+Gewinner: Computer
+
+Punkte Computer: 23.0
+Punkte Random:   500.0
+
+weighted_cut:
+  mean: 0.01 ms
+  max:  0.07 ms
+
+weighted_short:
+  mean: 1385.07 ms
+  max:  1505.87 ms
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 9
+Graph: n=23, m=26
+
+Gewinner: Computer
+
+Punkte Computer: 19.6
+Punkte Random:   500.0
+
+weighted_cut:
+  mean: 0.01 ms
+  max:  0.06 ms
+
+weighted_short:
+  mean: 1384.68 ms
+  max:  1500.76 ms
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 10
+Graph: n=16, m=20
+
+Gewinner: Computer
+
+Punkte Computer: 14.4
+Punkte Random:   500.0
+
+weighted_cut:
+  mean: 0.01 ms
+  max:  0.07 ms
+
+weighted_short:
+  mean: 1351.25 ms
+  max:  1512.41 ms
+
+Fehler aufgetreten: false
+
+========================================
+Spiel 11
+Graph: n=18, m=19
+
+Gewinner: Computer
+
+Punkte Computer: 11.3
+Punkte Random:   500.0
+
+weighted_cut:
+  mean: 0.01 ms
+  max:  0.06 ms
+
+weighted_short:
+  mean: 1350.01 ms
+  max:  1500.01 ms
+
+Fehler aufgetreten: false
+
