@@ -1,7 +1,3 @@
-using BenchmarkTools
-
-#unsere alten Funktionen optimiert und an die neue Datenstruktur für Zusammenhangskomponenten angepasst - in Zusammenarbeit mit Gemini :)
-
 const punishment = 100.0
 
 struct ComponentTracker
@@ -444,7 +440,8 @@ function dijkstra(g::GameGraph, s::Vertex, t::Vertex)::Float64
     end
     return punishment
 end
- 
+
+using BenchmarkTools
 #####################################################################TEST FÜR MINHEAP###############################################
 #= println("Generiere Testdaten...")
 N = 10_000  # Anzahl der Elemente im Heap
@@ -476,16 +473,10 @@ println("Benchmark startet. Das kann einen Moment dauern...")
 @btime dijkstra($g, $g.s, $g.t) =#
 
 #########################################################################BENCHMARK SPIELE###########################################################
-using Statistics
+const OUTFILE = "benchmark_aktuell.txt"
+const ERRORFILE = "errors_aktuell.txt"
 
-const OUTFILE = "benchmark.txt"
-const ERRORFILE = "errors.txt"
-
-# Dateien initialisieren
-open(OUTFILE, "w") do io
-    println(io, "Benchmark gestartet\n")
-end
-
+# Dateien initialisieren (Errorlog leeren)
 open(ERRORFILE, "w") do io
     println(io, "Fehlerlog gestartet\n")
 end
@@ -497,29 +488,23 @@ function test()
     computer_points_sum = 0.0
     random_points_sum = 0.0
 
-    global_max_move_time = 0.0
+    total_computer_moves = 0
+    computer_move_time_sum = 0.0
+    global_max_computer_time = 0.0
 
-    i = 0
-    while i ≤ 1
-        i += 1
+    i = 1
+    while i ≤ 1000 # Limit nach Bedarf anpassen
 
-        n = rand(300:300)
-        m = rand(n:min(2n - 1, n*(n-1)÷2 - 1))
+        n = rand(5:25)
+        m = rand(floor(Int, 1.5*n):min(2n - 1))
 
         g = random_graph(n, m, weighted = true)
-
-        had_error = false
 
         ####################################################
         # Random vs Computer (weighted_cut)
         ####################################################
 
         game = new_game(d_copy(g))
-
-        move_times_cut = Float64[]
-        cut_memory = Int128[]
-        timeout = false
-
         len = length(valid_moves(game))
 
         while len ≥ 1
@@ -529,20 +514,17 @@ function test()
             if len ≥ 1
                 try
                     t1 = time_ns()
-                    # Korrektur: Base.@allocated statt @ballocated
-                    mem = @allocated make_move!(game, weighted_cut(game))
+                    make_move!(game, weighted_cut(game))
                     t2 = time_ns()
 
                     dt = (t2 - t1) / 1e6
-                    push!(move_times_cut, dt)
-                    push!(cut_memory, mem)
-
-                    if dt > 2000
-                        timeout = true
+                    
+                    total_computer_moves += 1
+                    computer_move_time_sum += dt
+                    if dt > global_max_computer_time
+                        global_max_computer_time = dt
                     end
-
                 catch e
-                    had_error = true
                     open(ERRORFILE, "a") do io
                         println(io, "ERROR in weighted_cut (Spiel $i)")
                         println(io, "n=$n, m=$m")
@@ -550,8 +532,7 @@ function test()
                             showerror(io, exc, bt)
                             println(io)
                         end
-                        println(io)
-                        println(io)
+                        println(io, "\n")
                     end 
                 end
 
@@ -570,29 +551,22 @@ function test()
         ####################################################
 
         game = new_game(d_copy(g))
-
-        move_times_short = Float64[]
-        memory_short = Int128[]
-
         len = length(valid_moves(game))
-    
+        
         while len ≥ 1
             try
                 t1 = time_ns()
-                # Korrektur: Base.@allocated statt @ballocated
-                mem = @allocated make_move!(game, weighted_short(game))
+                make_move!(game, weighted_short(game))
                 t2 = time_ns()
 
                 dt = (t2 - t1) / 1e6
-                push!(move_times_short, dt)
-                push!(memory_short, mem)
-
-                if dt > 2000
-                    timeout = true
+                
+                total_computer_moves += 1
+                computer_move_time_sum += dt
+                if dt > global_max_computer_time
+                    global_max_computer_time = dt
                 end
-
             catch e
-                had_error = true
                 open(ERRORFILE, "a") do io
                     println(io, "ERROR in weighted_short (Spiel $i)")
                     println(io, "n=$n, m=$m")
@@ -600,7 +574,7 @@ function test()
                         showerror(io, exc, bt)
                         println(io)
                     end
-                    println(io)
+                    println(io, "\n")
                 end 
             end
 
@@ -619,88 +593,37 @@ function test()
         )
 
         ####################################################
-        # Statistik
+        # Statistik & Gewinner ermitteln
         ####################################################
 
         if points_computer < points_random
-            winner = "Computer"
             computer_wins += 1
         else
-            winner = "Random"
             random_wins += 1
         end
 
         computer_points_sum += points_computer
         random_points_sum += points_random
 
-        mean_cut = isempty(move_times_cut) ? 0.0 : mean(move_times_cut)
-        max_cut  = isempty(move_times_cut) ? 0.0 : maximum(move_times_cut)
-
-        mean_short = isempty(move_times_short) ? 0.0 : mean(move_times_short)
-        max_short  = isempty(move_times_short) ? 0.0 : maximum(move_times_short)
-        
-        # Sichern gegen ArgumentError, wenn die Arrays leer sind (z.B. durch frühe Fehler)
-        mean_mem_cut = isempty(cut_memory) ? 0.0 : mean(cut_memory)
-        mean_mem_short = isempty(memory_short) ? 0.0 : mean(memory_short)
-
-        global_max_move_time = max(global_max_move_time, max(max_cut, max_short))
+        win_percentage_computer = (computer_wins / i) * 100
+        mean_points_computer = computer_points_sum / i
+        mean_points_random = random_points_sum / i
+        mean_computer_time = total_computer_moves > 0 ? (computer_move_time_sum / total_computer_moves) : 0.0
 
         ####################################################
-        # Benchmark Output
+        # Benchmark Output (Überschreibt die Datei jedes Mal)
         ####################################################
 
-        open(OUTFILE, "a") do io
+        open(OUTFILE, "w") do io
             println(io, "========================================")
-            println(io, "Spiel $i")
-            println(io, "Graph: n=$n, m=$m")
-            println(io)
-            println(io, "Gewinner: $winner")
-            println(io)
-            println(io, "Punkte Computer: $points_computer")
-            println(io, "Punkte Random:   $points_random")
-            println(io)
-
-            println(io, "weighted_cut:")
-            println(io, "  mean: $(round(mean_cut, digits=2)) ms")
-            println(io, "  max:  $(round(max_cut, digits=2)) ms")
-            println(io)
-
-            println(io, "weighted_short:")
-            println(io, "  mean: $(round(mean_short, digits=2)) ms")
-            println(io, "  max:  $(round(max_short, digits=2)) ms")
-            println(io)
-
-            # Korrektur der RAM-Ausgabe, damit sie robuster ist
-            println(io, "Verbrauchter Heap-Speicher (cut): ", round(mean_mem_cut * 1e-3, digits=2), " KB.")
-            println(io, "Verbrauchter Heap-Speicher (short): ", round(mean_mem_short * 1e-3, digits=2), " KB.")
-            println(io)
-
-            println(io, "Fehler aufgetreten: $had_error")
-            println(io)
+            println(io, "Spiele bis jetzt gespielt: $i")
+            println(io, "Computer-Siegesquote:      $(round(win_percentage_computer, digits=2)) %")
+            println(io, "Mittlere Punktzahl (Comp): $(round(mean_points_computer, digits=2))")
+            println(io, "Mittlere Punktzahl (Rand): $(round(mean_points_random, digits=2))")
+            println(io, "Mittlere Computerzugzeit:  $(round(mean_computer_time, digits=2)) ms")
+            println(io, "Maximale Computerzugzeit:  $(round(global_max_computer_time, digits=2)) ms")
+            println(io, "========================================")
         end
-
-        ####################################################
-        # Zwischenstand
-        ####################################################
-
-        if i % 60 == 0
-            avg_comp = computer_points_sum / i
-            avg_rand = random_points_sum / i
-
-            open(OUTFILE, "a") do io
-                println(io, "########################################")
-                println(io, "Zwischenstand nach $i Spielen")
-                println(io)
-                println(io, "Computer-Siege: $computer_wins")
-                println(io, "Random-Siege:   $random_wins")
-                println(io)
-                println(io, "Ø Computerpunkte: $(round(avg_comp, digits=2))")
-                println(io, "Ø Randompunkte:   $(round(avg_rand, digits=2))")
-                println(io)
-                println(io, "Max. Zugzeit bisher: $(round(global_max_move_time, digits=2)) ms")
-                println(io, "########################################")
-                println(io)
-            end
-        end
+        i += 1
     end
 end

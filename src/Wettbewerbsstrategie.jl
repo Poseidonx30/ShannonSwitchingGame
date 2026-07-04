@@ -50,7 +50,7 @@ function weighted_cut(state::GameState)::Edge
             cuts_edge = chase(EXTENDED_STATE[], state)
         else
             end_time = time()   
-            cuts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.5 - (end_time - start_time))
+            cuts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.8 - (end_time - start_time))
         end 
     end 
     delete!(EXTENDED_STATE[].merged_graph.edges, cuts_edge)
@@ -81,7 +81,7 @@ function weighted_short(state::GameState)::Edge
     end
     if EXTENDED_STATE[].winner == :short
         end_time = time()
-        shorts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.5 - (end_time - start_time))
+        shorts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.8 - (end_time - start_time))
     elseif EXTENDED_STATE[].has_winning_strategy == :short
         shorts_edge = chase(EXTENDED_STATE[], state)
     else
@@ -91,7 +91,7 @@ function weighted_short(state::GameState)::Edge
             shorts_edge = chase(EXTENDED_STATE[], state)
         else
             end_time = time()
-            shorts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.5 - (end_time - start_time))
+            shorts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.8 - (end_time - start_time))
         end 
     end 
     if !(get_component!(merged_graph.components, shorts_edge.u.id) == get_component!(merged_graph.components, merged_graph.s.id) && get_component!(merged_graph.components, shorts_edge.v.id) == get_component!(merged_graph.components, merged_graph.t.id) 
@@ -178,8 +178,7 @@ function select(node::MCTS_node, short_graph::GameGraph, short_merged_graph::Eff
             end 
             C = 10
             exploration = C * sqrt(2.0 * log_parent_visits / child.visits)
-            exploitation = child.total_weight_at_end / child.visits
-
+            exploitation = child.total_weight_at_end / child.visits 
             val = is_short ? -exploitation + exploration : exploitation + exploration
             if val > ucb
                 max_child = child
