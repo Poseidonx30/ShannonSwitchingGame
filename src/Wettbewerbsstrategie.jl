@@ -50,7 +50,7 @@ function weighted_cut(state::GameState)::Edge
             cuts_edge = chase(EXTENDED_STATE[], state)
         else
             end_time = time()   
-            cuts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.5 - (end_time - start_time))
+            cuts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.8 - (end_time - start_time))
         end 
     end 
     delete!(EXTENDED_STATE[].merged_graph.edges, cuts_edge)
@@ -81,7 +81,7 @@ function weighted_short(state::GameState)::Edge
     end
     if EXTENDED_STATE[].winner == :short
         end_time = time()
-        shorts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.5 - (end_time - start_time))
+        shorts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.8 - (end_time - start_time))
     elseif EXTENDED_STATE[].has_winning_strategy == :short
         shorts_edge = chase(EXTENDED_STATE[], state)
     else
@@ -91,7 +91,7 @@ function weighted_short(state::GameState)::Edge
             shorts_edge = chase(EXTENDED_STATE[], state)
         else
             end_time = time()
-            shorts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.5 - (end_time - start_time))
+            shorts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.8 - (end_time - start_time))
         end 
     end 
     if !(get_component!(merged_graph.components, shorts_edge.u.id) == get_component!(merged_graph.components, merged_graph.s.id) && get_component!(merged_graph.components, shorts_edge.v.id) == get_component!(merged_graph.components, merged_graph.t.id) 
@@ -122,6 +122,11 @@ mutable struct MCTS_node
     last_move::Union{Nothing,Edge}
 end
 
+mutable struct ValueTracker
+    Q_min::Float64
+    Q_max::Float64
+end
+
 function MCTS(state::ExtendedGameState, orig_state::GameState; time_limit = 1.0)::Edge # state.graph muss die von short beanspruchten Kanten enthalten, WICHTIG: die Zusammenhangskomponenten von ComponentTracker müssen berichtigt werden, wenn der Anfangsgraph nicht-leer ist
     start_time = time()
     root_node = MCTS_node(nothing, Vector{MCTS_node}(), 0.0, 0, orig_state.current_player, false, nothing)
@@ -131,6 +136,7 @@ function MCTS(state::ExtendedGameState, orig_state::GameState; time_limit = 1.0)
     if isempty(untried_actions_at_root)
         untried_actions_at_root = valid_moves(orig_state)
     end
+    tracker = ValueTracker(Inf, -Inf)
     # iterations = 0
     while true
         if time() - start_time >= time_limit
@@ -140,20 +146,20 @@ function MCTS(state::ExtendedGameState, orig_state::GameState; time_limit = 1.0)
         short_merged_graph = copy(state.merged_graph)
         untried_actions = copy(untried_actions_at_root)
         root_node.visits += 1
-        node = select(root_node, short_graph, short_merged_graph, untried_actions)
+        node = select(root_node, short_graph, short_merged_graph, untried_actions, tracker)
         if node.terminal
-            backpropagate!(node, node.total_weight_at_end / (node.visits - 1))
+            backpropagate!(node, node.total_weight_at_end / (node.visits - 1), tracker)
             # iterations += 1
             continue
         end
         node = expand!(node, short_graph, short_merged_graph, untried_actions)
         if node[2] != -1 # dann ist der expandierte Zustand ein Endzustand
-            backpropagate!(node[1], node[2])
+            backpropagate!(node[1], node[2], tracker)
             # iterations += 1
             continue
         end
         weight = simulate!(node[1], short_graph, short_merged_graph, untried_actions)
-        backpropagate!(node[1], weight)
+        backpropagate!(node[1], weight, tracker)
         # iterations += 1
     end
     # println("Der Computer hat ", iterations, " viele Iterationen geschafft.")
@@ -161,7 +167,7 @@ function MCTS(state::ExtendedGameState, orig_state::GameState; time_limit = 1.0)
     return max_child.last_move
 end 
 
-function select(node::MCTS_node, short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge})::MCTS_node
+function select(node::MCTS_node, short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge}, tracker::ValueTracker)::MCTS_node
     current_node = node
     while !isempty(current_node.children)
         ucb = -Inf
@@ -169,6 +175,7 @@ function select(node::MCTS_node, short_graph::GameGraph, short_merged_graph::Eff
         found_node = false
         log_parent_visits = log(current_node.visits)
         is_short = current_node.current_player == :short
+        span = tracker.Q_max - tracker.Q_min
         for child in current_node.children
             if child.visits == 0 # nur wichtig, wenn wir in einem Schritt mehrere Knoten expanden
                 make_move!(short_graph, short_merged_graph, untried_actions, child.last_move, current_node.current_player)
@@ -176,11 +183,17 @@ function select(node::MCTS_node, short_graph::GameGraph, short_merged_graph::Eff
                 found_node = true
                 break
             end 
-            C = 10
-            exploration = C * sqrt(2.0 * log_parent_visits / child.visits)
-            exploitation = child.total_weight_at_end / child.visits
 
-            val = is_short ? -exploitation + exploration : exploitation + exploration
+            exploration = sqrt(2.0 * log_parent_visits / child.visits)
+            exploitation = child.total_weight_at_end / child.visits
+            
+            if span > 1e-8
+                q_norm = (exploitation - tracker.Q_min) / span
+            else
+                q_norm = 0.5 # Neutraler Startwert, wenn alle Pfade noch denselben Wert haben
+            end
+ 
+            val = is_short ? -q_norm + exploration : q_norm + exploration
             if val > ucb
                 max_child = child
                 ucb = val
@@ -253,10 +266,21 @@ function simulate!(node::MCTS_node, short_graph::GameGraph, short_merged_graph::
     return dijkstra(short_graph, short_graph.s, short_graph.t)
 end
 
-function backpropagate!(node::MCTS_node, weight_at_end::Float64)
+function backpropagate!(node::MCTS_node, weight_at_end::Float64, tracker::ValueTracker)
     current_node = node
     while !isnothing(current_node) # wird immer mit mindestens Kindknoten von root aufgerufen
         current_node.total_weight_at_end += weight_at_end
+
+        if current_node.visits > 0
+            q_current = current_node.total_weight_at_end / current_node.visits
+            if q_current < tracker.Q_min
+                tracker.Q_min = q_current
+            end
+            if q_current > tracker.Q_max
+                tracker.Q_max = q_current
+            end
+        end
+
         current_node = current_node.parent
     end
 end
