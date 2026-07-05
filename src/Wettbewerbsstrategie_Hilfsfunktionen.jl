@@ -1,7 +1,3 @@
-using BenchmarkTools
-
-#unsere alten Funktionen optimiert und an die neue Datenstruktur für Zusammenhangskomponenten angepasst - in Zusammenarbeit mit Gemini :)
-
 const punishment = 100.0
 
 struct ComponentTracker
@@ -445,6 +441,7 @@ function dijkstra(g::GameGraph, s::Vertex, t::Vertex)::Float64
     return punishment
 end
  
+using BenchmarkTools
 #####################################################################TEST FÜR MINHEAP###############################################
 #= println("Generiere Testdaten...")
 N = 10_000  # Anzahl der Elemente im Heap
