@@ -1,16 +1,78 @@
-#unsere alten Funktionen optimiert und an die neue Datenstruktur für Zusammenhangskomponenten angepasst - in Zusammenarbeit mit Gemini :)
+const punishment = 160.0
 
-function get_component!(ct::ComponentTracker, id::Int)::Int
-    if ct.parent[id] == id
-        return id
+struct ComponentTracker
+    parent::Vector{Int}
+    size::Vector{Int}
+    id_to_idx::Dict{Int, Int}  # Map: Reale ID -> Array-Index
+    idx_to_id::Vector{Int}     # Map: Array-Index -> Reale ID (für die Rückgabe)
+
+    ComponentTracker(p, s, id2idx, idx2id) = new(p, s, id2idx, idx2id)
+
+    function ComponentTracker(vertex_ids::Vector{Int})
+        n = length(vertex_ids)
+        parent = collect(1:n)
+        size = fill(1, n)
+        id_to_idx = Dict{Int, Int}()
+        sizehint!(id_to_idx, n) # Optimiert den Speicher des Dicts vorab
+        idx_to_id = Vector{Int}(undef, n)
+    
+        for (idx, id) in enumerate(vertex_ids)
+            id_to_idx[id] = idx
+            idx_to_id[idx] = id
+        end
+    
+        return new(parent, size, id_to_idx, idx_to_id)
     end
-    ct.parent[id] = get_component!(ct, ct.parent[id])   #Pfadkompression 
-    return ct.parent[id]
 end
 
-function merge_components!(ct::ComponentTracker, u_id::Int, v_id::Int)
-    root_u = get_component!(ct, u_id)
-    root_v = get_component!(ct, v_id)
+mutable struct EfficientGameGraph
+    edges::Base.Set{Edge}  
+    components::ComponentTracker      #Short fügt hierin zusammen
+    s::Vertex                 
+    t::Vertex                 
+end
+
+mutable struct ExtendedGameState
+    graph::EfficientGameGraph
+    merged_graph::EfficientGameGraph
+    short_graph::GameGraph
+    A::Base.Set{Edge} 
+    B::Base.Set{Edge} 
+    e1::Edge
+    e2::Edge
+    has_winning_strategy::Symbol
+    current_player::Symbol
+    first_optimal_move::Bool 
+    imaginary_moves::Base.Set{Edge}
+    winner::Union{Symbol, Nothing}
+end
+
+Base.copy(ct::ComponentTracker)::ComponentTracker = ComponentTracker(copy(ct.parent), copy(ct.size), copy(ct.id_to_idx), copy(ct.idx_to_id))
+
+Base.copy(g::GameGraph)::GameGraph = GameGraph(copy(g.vertices), copy(g.edges), g.s, g.t)
+
+Base.copy(g::EfficientGameGraph)::EfficientGameGraph = EfficientGameGraph(copy(g.edges), copy(g.components), g.s, g.t)
+
+function _find_idx!(ct::ComponentTracker, idx::Int)::Int
+    if ct.parent[idx] == idx
+        return idx
+    end
+    ct.parent[idx] = _find_idx!(ct, ct.parent[idx]) # Pfadkompression
+    return ct.parent[idx]
+end
+
+function _get_component!(ct::ComponentTracker, id::Int)::Int
+    idx = ct.id_to_idx[id] 
+    root_idx = _find_idx!(ct, idx)
+    return ct.idx_to_id[root_idx]
+end
+
+function _merge_components!(ct::ComponentTracker, u_id::Int, v_id::Int)
+    u_idx = ct.id_to_idx[u_id]
+    v_idx = ct.id_to_idx[v_id]
+    
+    root_u = _find_idx!(ct, u_idx)
+    root_v = _find_idx!(ct, v_idx)
     
     if root_u != root_v
         if ct.size[root_u] < ct.size[root_v]
@@ -21,21 +83,21 @@ function merge_components!(ct::ComponentTracker, u_id::Int, v_id::Int)
     end
 end
 
-function check_st_connection(G::EfficientGameGraph)::Bool
-    if get_component!(G.components, G.s) == get_component!(G.components, G.t)
+function _check_st_connection(G::EfficientGameGraph)::Bool
+    if _get_component!(G.components, G.s.id) == _get_component!(G.components, G.t.id)
         return true
     end
     temp_components = copy(G.components)
     for e in G.edges
-        merge_components!(temp_components, e.u.id, e.v.id)
-        if get_component!(temp_components, G.s) == get_component!(temp_components, G.t)
+        _merge_components(temp_components, e.u.id, e.v.id)
+        if _get_component!(temp_components, G.s.id) == _get_component!(temp_components, G.t.id)
             return true
         end
     end    
     return false
 end
 
-function kruskal(G::EfficientGameGraph, minimal::Bool)::Base.Set{Edge}
+function _kruskal(G::EfficientGameGraph, minimal::Bool)::Base.Set{Edge}
     temp_components = copy(G.components)
     tree_edges = Base.Set{Edge}()  
     if minimal
@@ -44,35 +106,35 @@ function kruskal(G::EfficientGameGraph, minimal::Bool)::Base.Set{Edge}
         edges_to_process = G.edges
     end 
     for e in edges_to_process
-        root_u = get_component!(temp_components, e.u)
-        root_v = get_component!(temp_components, e.v)
+        root_u = _get_component!(temp_components, e.u.id)
+        root_v = _get_component!(temp_components, e.v.id)
         if root_u != root_v
             push!(tree_edges, e) 
-            merge_components!(temp_components, e.u, e.v)
+            _merge_components(temp_components, e.u.id, e.v.id)
         end
     end   
     return tree_edges
 end
 
-function gemeinsame_Sehnen(G::EfficientGameGraph, T1::Base.Set{Edge})::Base.Set{Edge}
+function _gemeinsame_Sehnen(G::EfficientGameGraph, T1::Base.Set{Edge})::Base.Set{Edge}
     EdgesG = Base.Set{Edge}()
     for e in G.edges
-        if (get_component!(G.components, e.u.id) != get_component!(G.components, e.v.id)) && e ∉ T1
+        if (_get_component!(G.components, e.u.id) != _get_component!(G.components, e.v.id)) && e ∉ T1
             push!(EdgesG, e)
         end 
     end      
     return EdgesG
 end
 
-function FC(Sehne::Edge, Spannbaum::Base.Set{Edge}, components::ComponentTracker)::Base.Set{Edge} 
-    start_root = get_component!(components, Sehne.u)
-    target_root = get_component!(components, Sehne.v)
+function _FC(Sehne::Edge, Spannbaum::Base.Set{Edge}, components::ComponentTracker)::Base.Set{Edge} 
+    start_root = _get_component!(components, Sehne.u.id)
+    target_root = _get_component!(components, Sehne.v.id)
     
     adj = Dict{Int, Vector{Tuple{Int, Edge}}}() #Adjazenzliste der Form Key: Root-ID der Komponente -> Value: Liste von (Nachbar-Root-ID, Kante im Spannbaum)
     
     for e in Spannbaum # Diese Kante verbindet zwei verschiedene Komponenten, Wir fügen sie als Kante hinzu
-        root_u = get_component!(components, e.u)
-        root_v = get_component!(components, e.v)
+        root_u = _get_component!(components, e.u.id)
+        root_v = _get_component!(components, e.v.id)
         push!(get!(adj, root_u, Tuple{Int, Edge}[]), (root_v, e))  #bitte frag mich nichts zu get ;)
         push!(get!(adj, root_v, Tuple{Int, Edge}[]), (root_u, e))
     end
@@ -115,18 +177,19 @@ function FC(Sehne::Edge, Spannbaum::Base.Set{Edge}, components::ComponentTracker
 end
 
 function who_can_win(g::ExtendedGameState, minimal::Bool)
-    T1_edges = kruskal(g.merged_graph, minimal)
+    T1_edges = _kruskal(g.merged_graph, minimal)
     T2_edges = Base.copy(T1_edges)
     if minimal 
-        Sehnen = sort(collect(gemeinsame_Sehnen(g.merged_graph, T1_edges)), by = e -> e.weight)
+        Sehnen = sort(collect(_gemeinsame_Sehnen(g.merged_graph, T1_edges)), by = e -> e.weight)
     else 
-        Sehnen = collect(gemeinsame_Sehnen(g.merged_graph, T1_edges))
+        Sehnen = collect(_gemeinsame_Sehnen(g.merged_graph, T1_edges))
     end 
     e1 = g.e1
-    e2 = Edge(-Inf, g.merged_graph.s, g.merged_graph.t, 0.0, :neutral)  #ich hoffe im Wettbewerb gibt es keine Kanten mit Gewichten inf und -inf...
+    e2 = g.e2  #ich hoffe im Wettbewerb gibt es keine Kanten mit Gewichten -1, -2; sonst ändern
     push!(Sehnen, e1, e2)
     i = 0
-    while i < length(Sehnen) && !isempty(intersect(T1_edges, T2_edges))   #length(Sehnen) = j + 2 
+    n = length(Sehnen)
+    while i < n && !isdisjoint(T1_edges, T2_edges)   #length(Sehnen) = j + 2 
         i += 1
         b = Sehnen[i]
         Layers = Vector{Base.Set{Edge}}()
@@ -139,13 +202,13 @@ function who_can_win(g::ExtendedGameState, minimal::Bool)
             T_next = (k % 2 == 1) ? T2_edges : T1_edges
             new_set = Base.Set{Edge}()
             for elem ∈ Layers[k]
-                fc = FC(elem, T, g.merge_graph.components)
+                fc = _FC(elem, T, g.merged_graph.components)
                 for elem2 ∈ fc
                     if !haskey(parent, elem2)
                         parent[elem2] = elem
                     end
                 end
-                new_set = Base.union(new_set, fc)
+                union!(new_set, fc)
             end  
             push!(Layers, new_set)
             if k == 1
@@ -176,61 +239,192 @@ function who_can_win(g::ExtendedGameState, minimal::Bool)
     end
     g.A = T1_edges
     g.B = T2_edges
-    if e1 ∈ T2_edges || e2 ∈ T1_edges
-        println("cut")
+    if e1 ∈ T2_edges || e2 ∈ T1_edges 
         g.has_winning_strategy = :cut
-    else 
-        println("short")
+        #println(:cut)
+    elseif e1 ∈ T1_edges 
+        g.has_winning_strategy = g.current_player
+        #println(g.current_player)
+    else
         g.has_winning_strategy = :short
+        #println(:short)
     end
 end
 
-function chase(g::ExtendedGameState)::Edge
-    if isempty(g.history)
-        last_move = g.e1  
+function chase(g::ExtendedGameState, state::GameState)::Edge
+    skip = false
+    if g.first_optimal_move == true 
+        if g.e1 ∈ g.A 
+            last_move = g.e1  
+        else 
+            last_move = rand(setdiff(symdiff(g.A, g.B), [g.e1, g.e2])) #wie unten
+            push!(g.imaginary_moves, last_move)
+            skip = true 
+        end 
+        g.first_optimal_move = false
     else
-        last_move = g.history[end][2]
+        last_move = state.history[end][2]
     end 
     T1_has_move = (last_move ∈ g.A)
     T2_has_move = (last_move ∈ g.B)
-    if (T1_has_move && T2_has_move) || (!T1_has_move && !T2_has_move) || last_move ∈ g.imaginary_moves
-        last_move = rand(symdiff(g.A, g.B))   #nicht optimal für Short. Man sollte wahrscheinlich einen Zug wählen, auf den die Antwort möglichst günstig ist.
-        #Auf alle möglichen zufälligen Züge aus der sym.diff. die Antwort zu berechnen (ggf. zusammen mit MCTS) dauert vlt. aber zu lang
-        push!(g.imaginary_moves, last_move)
+    if (T1_has_move && T2_has_move) || (!T1_has_move && !T2_has_move) || last_move ∈ g.imaginary_moves || _get_component!(g.merged_graph.components, last_move.u.id) == _get_component!(g.merged_graph.components, last_move.v.id)
+        if !skip
+            last_move = rand(setdiff(symdiff(g.A, g.B), [g.e1, g.e2]))   #nicht optimal für Short. Man sollte wahrscheinlich einen Zug wählen, auf den die Antwort möglichst günstig ist.
+            push!(g.imaginary_moves, last_move)
+        end
         T1_has_move = (last_move ∈ g.A)
         T2_has_move = !T1_has_move
     end 
     T = T1_has_move ? g.A : g.B
     T_strich = T2_has_move ? g.A : g.B
-    if g.current_player == :cut 
+    if state.current_player == :cut 
+        fc_last = _FC(last_move, T_strich, g.merged_graph.components)
         next_move = nothing 
-        for move in intersect(Base.Set(valid_moves(g)), FC(last_move, T_strich, g.merged_graph.components))
-            if last_move ∈ FC(move, T, g.merged_graph.components) 
+        for move in valid_moves(state)
+            if move ∈ fc_last && last_move ∈ _FC(move, T, g.merged_graph.components)
                 next_move = move 
                 break  
             end
         end
         if next_move === nothing 
-            println("das sollte nicht passieren")
-            return #MCTS
-        end 
+            error("das sollte nicht passieren")
+            #return rand(valid_moves(state)) 
+        end
     else 
+        fc_last = _FC(last_move, T_strich, g.merged_graph.components)
         next_moves = Base.Set{Edge}()
-        for move in intersect(Base.Set(valid_moves(g)), FC(last_move, T_strich, g.merged_graph.components))
-            if last_move ∈ FC(move, T, g.merged_graph.components) 
+        for move in valid_moves(state)
+            if move ∈ fc_last && last_move ∈ _FC(move, T, g.merged_graph.components) 
                 push!(next_moves, move) 
             end
         end
         if isempty(next_moves) #das darf eigentlich nicht passieren
-            println("das sollte nicht passieren")
-            return #MCTS 
+            error("das sollte nicht passieren")
+            #return rand(valid_moves(state)) 
         end
-        next_move = minimum(next_moves, by = e -> e.weight)  #hier vlt. MCTS auf alle Antworten - für Short
+        next_move = first(next_moves)
+        for e in next_moves
+            if e.weight < next_move.weight
+                next_move = e
+            end
+        end
     end 
-    T = (g.current_player == :cut) ? T_strich : T
-    cut_move = (g.current_player == :cut) ? next_move : last_move
-    short_move = (g.current_player == :cut) ? last_move : next_move
+    T = (state.current_player == :cut) ? T_strich : T
+    cut_move = (state.current_player == :cut) ? next_move : last_move
+    short_move = (state.current_player == :cut) ? last_move : next_move
     delete!(T, cut_move)
     push!(T, short_move)
     return next_move
+end
+
+
+mutable struct MinHeap
+    elements::Vector{Tuple{Int,Float64}}
+    size::Int
+    position::Vector{Int} 
+end
+
+function _min_heapify!(A::MinHeap, i::Int)
+    while true
+        l = 2 * i
+        r = 2 * i + 1
+        smallest = i
+        if l ≤ A.size && A.elements[l][2] < A.elements[smallest][2]
+            smallest = l
+        end
+        if r ≤ A.size && A.elements[r][2] < A.elements[smallest][2]
+            smallest = r
+        end
+        smallest == i && break
+        A.elements[i], A.elements[smallest] = A.elements[smallest], A.elements[i]
+        A.position[A.elements[i][1]] = i
+        A.position[A.elements[smallest][1]] = smallest
+        i = smallest
+    end
+    return A
+end
+
+function _extract_min!(A::MinHeap)
+    A.size == 0 && error("Heap ist leer")   
+    min_elem = A.elements[1]    
+    A.elements[1] = A.elements[A.size]
+    A.position[A.elements[1][1]] = 1    
+    A.size -= 1   
+    A.position[min_elem[1]] = 0    
+    if A.size > 0
+        _min_heapify!(A, 1)
+    end    
+    return min_elem
+end
+
+function _decrease_key!(A::MinHeap, i::Int, k::Float64)
+    A.elements[i][2] < k && error("Neuer Wert ist größer als aktueller Wert")    
+    A.elements[i] = (A.elements[i][1], k)   
+    while i > 1
+        parent = i ÷ 2
+        if A.elements[parent][2] > A.elements[i][2]
+            A.elements[i], A.elements[parent] = A.elements[parent], A.elements[i]
+            A.position[A.elements[i][1]] = i
+            A.position[A.elements[parent][1]] = parent            
+            i = parent
+        else
+            break
+        end
+    end
+end
+
+function _insert!(A::MinHeap, elems::Vector{Tuple{Int,Float64}})
+    new_size = A.size + length(elems)
+    if length(A.elements) < new_size
+        resize!(A.elements, new_size)
+    end
+    for (id, weight) ∈ elems
+        A.size += 1
+        A.elements[A.size] = (id, Inf)
+        if length(A.position) < id
+            resize!(A.position, max(id, length(A.position) * 2))
+        end
+        A.position[id] = A.size        
+        _decrease_key!(A, A.size, weight)
+    end
+end 
+
+function _dijkstra(g::GameGraph, s::Vertex, t::Vertex)::Float64
+    max_id = isempty(g.vertices) ? 0 : maximum(v -> v.id, g.vertices)
+    if max_id == 0
+        return punishment
+    end
+    adj = [Tuple{Int, Float64}[] for _ in 1:max_id]
+    for e in g.edges
+        push!(adj[e.u.id], (e.v.id, e.weight))
+        push!(adj[e.v.id], (e.u.id, e.weight)) 
+    end
+    dist = fill(Inf, max_id)
+    dist[s.id] = 0.0
+    elems = Vector{Tuple{Int,Float64}}(undef, length(g.vertices))
+    for (i, vertex) in enumerate(g.vertices)
+        elems[i] = (vertex.id, dist[vertex.id])
+    end
+    heap = MinHeap(Tuple{Int,Float64}[], 0, Int[])
+    _insert!(heap, elems)
+    while heap.size > 0
+        u_id, u_dist = _extract_min!(heap)
+        if u_dist == Inf 
+            break 
+        end
+        if u_id == t.id
+            return u_dist
+        end        
+        for (v_id, weight) in adj[u_id]
+            new_dist = u_dist + weight           
+            if new_dist < dist[v_id]
+                dist[v_id] = new_dist                
+                pos = heap.position[v_id]
+                if pos > 0 
+                    _decrease_key!(heap, pos, new_dist)
+                end
+            end
+        end
+    end
+    return punishment
 end
