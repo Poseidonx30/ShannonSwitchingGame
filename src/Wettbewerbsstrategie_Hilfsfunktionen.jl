@@ -1,4 +1,4 @@
-const punishment = 100.0
+const punishment = 160.0
 
 struct ComponentTracker
     parent::Vector{Int}
