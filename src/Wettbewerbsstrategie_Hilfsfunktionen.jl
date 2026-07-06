@@ -473,8 +473,8 @@ println("Benchmark startet. Das kann einen Moment dauern...")
 @btime dijkstra($g, $g.s, $g.t) =#
 
 #########################################################################BENCHMARK SPIELE###########################################################
-const OUTFILE = "benchmark_neu.txt"
-const ERRORFILE = "errors_neu.txt"
+const OUTFILE = "benchmark_neu_1.2.txt"
+const ERRORFILE = "errors_neu_1.2.txt"
 
 # Dateien initialisieren (Errorlog leeren)
 open(ERRORFILE, "w") do io
@@ -495,7 +495,7 @@ function test()
     i = 1
     while i ≤ 1000 # Limit nach Bedarf anpassen
 
-        n = rand(5:25)
+        n = rand(6:25)
         m = rand(floor(Int, 1.5*n):min(2n - 1))
 
         g = random_graph(n, m, weighted = true)
@@ -518,7 +518,7 @@ function test()
                     t2 = time_ns()
 
                     dt = (t2 - t1) / 1e6
-                    
+                    dt ≥ 2000 && println("cut", n, m)
                     total_computer_moves += 1
                     computer_move_time_sum += dt
                     if dt > global_max_computer_time
@@ -560,7 +560,7 @@ function test()
                 t2 = time_ns()
 
                 dt = (t2 - t1) / 1e6
-                
+                dt ≥ 2000 && println("short", n, m)
                 total_computer_moves += 1
                 computer_move_time_sum += dt
                 if dt > global_max_computer_time
