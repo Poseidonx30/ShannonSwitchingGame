@@ -3,17 +3,22 @@ const punishment = 160.0
 struct ComponentTracker
     parent::Vector{Int}
     size::Vector{Int}
-    id_to_idx::Dict{Int, Int}  # Map: Reale ID -> Array-Index
-    idx_to_id::Vector{Int}     # Map: Array-Index -> Reale ID (für die Rückgabe)
-
-    ComponentTracker(p, s, id2idx, idx2id) = new(p, s, id2idx, idx2id)
+    base_parent::Vector{Int} # Snapshot-Speicher
+    base_size::Vector{Int}   # Snapshot-Speicher
+    id_to_idx::Dict{Int, Int}
+    idx_to_id::Vector{Int}
 
     function ComponentTracker(vertex_ids::Vector{Int})
         n = length(vertex_ids)
         parent = collect(1:n)
         size = fill(1, n)
+        
+        # Die Snapshot-Arrays werden einmalig mit der gleichen Größe angelegt
+        base_parent = collect(1:n)
+        base_size = fill(1, n)
+        
         id_to_idx = Dict{Int, Int}()
-        sizehint!(id_to_idx, n) # Optimiert den Speicher des Dicts vorab
+        sizehint!(id_to_idx, n)
         idx_to_id = Vector{Int}(undef, n)
     
         for (idx, id) in enumerate(vertex_ids)
@@ -21,7 +26,7 @@ struct ComponentTracker
             idx_to_id[idx] = id
         end
     
-        return new(parent, size, id_to_idx, idx_to_id)
+        return new(parent, size, base_parent, base_size, id_to_idx, idx_to_id)
     end
 end
 
@@ -93,6 +98,18 @@ function merge_components!(ct::ComponentTracker, u_id::Int, v_id::Int)
         ct.parent[root_v] = root_u
         ct.size[root_u] += ct.size[root_v]
     end
+end
+
+function save_base_state!(ct::ComponentTracker)
+    # Speichert den aktuellen Zustand blitzschnell und ohne Allocations
+    copyto!(ct.base_parent, ct.parent)
+    copyto!(ct.base_size, ct.size)
+end
+
+function restore_base_state!(ct::ComponentTracker)
+    # Überschreibt die aktuellen Arrays wieder mit dem gespeicherten Zustand
+    copyto!(ct.parent, ct.base_parent)
+    copyto!(ct.size, ct.base_size)
 end
 
 function check_st_connection(G::EfficientGameGraph)::Bool
@@ -348,6 +365,7 @@ function min_heapify!(A::MinHeap, i::Int)
             smallest = r
         end
         smallest == i && break
+        
         A.elements[i], A.elements[smallest] = A.elements[smallest], A.elements[i]
         A.position[A.elements[i][1]] = i
         A.position[A.elements[smallest][1]] = smallest
@@ -359,10 +377,12 @@ end
 function extract_min!(A::MinHeap)
     A.size == 0 && error("Heap ist leer")   
     min_elem = A.elements[1]    
+    
     A.elements[1] = A.elements[A.size]
     A.position[A.elements[1][1]] = 1    
     A.size -= 1   
     A.position[min_elem[1]] = 0    
+    
     if A.size > 0
         min_heapify!(A, 1)
     end    
@@ -385,59 +405,91 @@ function decrease_key!(A::MinHeap, i::Int, k::Float64)
     end
 end
 
-function insert!(A::MinHeap, elems::Vector{Tuple{Int,Float64}})
-    new_size = A.size + length(elems)
-    if length(A.elements) < new_size
-        resize!(A.elements, new_size)
+function build_heap!(A::MinHeap, elems::AbstractVector{Tuple{Int,Float64}})
+    A.size = length(elems)
+    for i in 1:A.size
+        id, weight = elems[i]
+        A.elements[i] = (id, weight)
+        A.position[id] = i
     end
-    for (id, weight) ∈ elems
-        A.size += 1
-        A.elements[A.size] = (id, Inf)
-        if length(A.position) < id
-            resize!(A.position, max(id, length(A.position) * 2))
-        end
-        A.position[id] = A.size        
-        decrease_key!(A, A.size, weight)
+    for i in (A.size ÷ 2):-1:1
+        min_heapify!(A, i)
     end
-end 
+end
 
-function dijkstra(g::GameGraph, s::Vertex, t::Vertex)::Float64
+struct DijkstraWorkspace
+    adj::Vector{Vector{Tuple{Int, Float64}}}
+    dist::Vector{Float64}
+    elems::Vector{Tuple{Int, Float64}}
+    heap::MinHeap
+end
+
+function DijkstraWorkspace(max_nodes::Int = 50)
+    adj = [Tuple{Int, Float64}[] for _ in 1:max_nodes]
+    dist = fill(Inf, max_nodes)
+    elems = Vector{Tuple{Int, Float64}}(undef, max_nodes)
+    
+    # Heap-Speicher direkt auf max_nodes festlegen
+    heap_elements = fill((0, 0.0), max_nodes)
+    heap_position = fill(0, max_nodes)
+    heap = MinHeap(heap_elements, 0, heap_position)
+    
+    return DijkstraWorkspace(adj, dist, elems, heap)
+end
+
+
+function dijkstra!(g::GameGraph, s::Vertex, t::Vertex, ws::DijkstraWorkspace)::Float64
     max_id = isempty(g.vertices) ? 0 : maximum(v -> v.id, g.vertices)
+    
     if max_id == 0
         return punishment
     end
-    adj = [Tuple{Int, Float64}[] for _ in 1:max_id]
+
+    if max_id > length(ws.dist)
+        error("DijkstraWorkspace zu klein! Erhöhe max_nodes bei der Initialisierung.")
+    end
+
+    for i in 1:max_id
+        empty!(ws.adj[i])
+    end
+    fill!(ws.dist, Inf)
+    
     for e in g.edges
-        push!(adj[e.u.id], (e.v.id, e.weight))
-        push!(adj[e.v.id], (e.u.id, e.weight)) 
+        push!(ws.adj[e.u.id], (e.v.id, e.weight))
+        push!(ws.adj[e.v.id], (e.u.id, e.weight)) 
     end
-    dist = fill(Inf, max_id)
-    dist[s.id] = 0.0
-    elems = Vector{Tuple{Int,Float64}}(undef, length(g.vertices))
+    
+    ws.dist[s.id] = 0.0
+
+    num_vertices = length(g.vertices)
     for (i, vertex) in enumerate(g.vertices)
-        elems[i] = (vertex.id, dist[vertex.id])
+        ws.elems[i] = (vertex.id, ws.dist[vertex.id])
     end
-    heap = MinHeap(Tuple{Int,Float64}[], 0, Int[])
-    insert!(heap, elems)
-    while heap.size > 0
-        u_id, u_dist = extract_min!(heap)
+    
+    build_heap!(ws.heap, view(ws.elems, 1:num_vertices)) 
+    
+    while ws.heap.size > 0
+        u_id, u_dist = extract_min!(ws.heap)
+        
         if u_dist == Inf 
             break 
         end
         if u_id == t.id
             return u_dist
         end        
-        for (v_id, weight) in adj[u_id]
+        
+        for (v_id, weight) in ws.adj[u_id]
             new_dist = u_dist + weight           
-            if new_dist < dist[v_id]
-                dist[v_id] = new_dist                
-                pos = heap.position[v_id]
+            if new_dist < ws.dist[v_id]
+                ws.dist[v_id] = new_dist                
+                pos = ws.heap.position[v_id]
                 if pos > 0 
-                    decrease_key!(heap, pos, new_dist)
+                    decrease_key!(ws.heap, pos, new_dist)
                 end
             end
         end
     end
+    
     return punishment
 end
 
