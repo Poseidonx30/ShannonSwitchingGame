@@ -1,0 +1,8 @@
+========================================
+Spiele bis jetzt gespielt: 2
+Computer-Siegesquote:      100.0 %
+Mittlere Punktzahl (Comp): 9.0
+Mittlere Punktzahl (Rand): 160.0
+Mittlere Computerzugzeit:  1020.5 ms
+Maximale Computerzugzeit:  1701.74 ms
+========================================

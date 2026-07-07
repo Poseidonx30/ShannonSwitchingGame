@@ -8,6 +8,8 @@ struct ComponentTracker
     id_to_idx::Dict{Int, Int}
     idx_to_id::Vector{Int}
 
+    ComponentTracker(p, s, bp, bs, id2idx, idx2id) = new(p, s, bp, bs, id2idx, idx2id)
+
     function ComponentTracker(vertex_ids::Vector{Int})
         n = length(vertex_ids)
         parent = collect(1:n)
@@ -52,7 +54,7 @@ mutable struct ExtendedGameState
     winner::Union{Symbol, Nothing}
 end
 
-Base.copy(ct::ComponentTracker)::ComponentTracker = ComponentTracker(copy(ct.parent), copy(ct.size), copy(ct.id_to_idx), copy(ct.idx_to_id))
+Base.copy(ct::ComponentTracker)::ComponentTracker = ComponentTracker(copy(ct.parent), copy(ct.size), copy(ct.base_parent), copy(ct.base_size), copy(ct.id_to_idx), copy(ct.idx_to_id))
 
 Base.copy(g::GameGraph)::GameGraph = GameGraph(copy(g.vertices), copy(g.edges), g.s, g.t)
 
@@ -438,7 +440,7 @@ function DijkstraWorkspace(max_nodes::Int = 50)
 end
 
 
-function dijkstra!(g::GameGraph, s::Vertex, t::Vertex, ws::DijkstraWorkspace)::Float64
+function dijkstra(g::GameGraph, s::Vertex, t::Vertex, ws::DijkstraWorkspace)::Float64
     max_id = isempty(g.vertices) ? 0 : maximum(v -> v.id, g.vertices)
     
     if max_id == 0
@@ -525,8 +527,8 @@ println("Benchmark startet. Das kann einen Moment dauern...")
 @btime dijkstra($g, $g.s, $g.t) =#
 
 #########################################################################BENCHMARK SPIELE###########################################################
-const OUTFILE = "benchmark_neu_1.2.txt"
-const ERRORFILE = "errors_neu_1.2.txt"
+const OUTFILE = "benchmark_neu_1.3.txt"
+const ERRORFILE = "errors_neu_1.3.txt"
 
 # Dateien initialisieren (Errorlog leeren)
 open(ERRORFILE, "w") do io
@@ -545,7 +547,7 @@ function test()
     global_max_computer_time = 0.0
 
     i = 1
-    while i ≤ 1000 # Limit nach Bedarf anpassen
+    while i ≤ 2 # Limit nach Bedarf anpassen
 
         n = rand(6:25)
         m = rand(floor(Int, 1.5*n):min(2n - 1))
@@ -595,9 +597,10 @@ function test()
         points_random = dijkstra(
             game.short_Graph,
             game.short_Graph.s,
-            game.short_Graph.t
+            game.short_Graph.t,
+            DijkstraWorkspace(50)
         )
-
+        
         ####################################################
         # Computer vs Random (weighted_short)
         ####################################################
@@ -641,7 +644,7 @@ function test()
         points_computer = dijkstra(
             game.short_Graph,
             game.short_Graph.s,
-            game.short_Graph.t
+            game.short_Graph.t, DijkstraWorkspace(50)
         )
 
         ####################################################

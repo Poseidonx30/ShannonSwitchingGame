@@ -1,4 +1,4 @@
-const TEAM_NAME::String = "StockFisch 1.1"
+const TEAM_NAME::String = "StockFisch 1.2"
 
 Base.isequal(E1::Edge, E2::Edge) = E1.id == E2.id # es gibt nicht zwei gleiche Kanten mit unterschiedlicher ID
 Base.hash(E::Edge, h::UInt) = hash(E.id, h)
@@ -15,7 +15,7 @@ function weighted_cut(state::GameState)::Edge
         e2 = Edge(-2, state.graph.s, state.graph.t, 0.0, :neutral)
         short_graph = GameGraph(Vector{Vertex}(), Vector{Edge}(), state.graph.s, state.graph.t)
         short_graph.vertices = state.graph.vertices
-        graph = EfficientGameGraph(Base.Set(state.graph.edges), ComponentTracker(Vector{Int}(), Vector{Int}(), Dict{Int, Int}(), Vector{Int}()), state.graph.s, state.graph.t) 
+        graph = EfficientGameGraph(Base.Set(state.graph.edges), ComponentTracker(Int[]), state.graph.s, state.graph.t) 
         merged_graph = EfficientGameGraph(Base.Set(state.graph.edges), ComponentTracker([v.id for v in state.graph.vertices]), state.graph.s, state.graph.t) 
         EXTENDED_STATE[] = ExtendedGameState(graph, merged_graph, short_graph, Base.Set{Edge}(), Base.Set{Edge}(), e1, e2, :neutral, :cut, false, Base.Set{Edge}(), nothing)
     end 
@@ -33,12 +33,12 @@ function weighted_cut(state::GameState)::Edge
     end
     if EXTENDED_STATE[].winner == :cut  #schon gewonnen (im aktuellen merged graph sind s und t nicht mehr verbunden)
         end_time = time()   
-        cuts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.7 - (end_time - start_time))
+        cuts_edge = @time MCTS(EXTENDED_STATE[], state, time_limit = 1.7 - (end_time - start_time))
         delete!(EXTENDED_STATE[].merged_graph.edges, cuts_edge)
         return cuts_edge
     end 
     if EXTENDED_STATE[].has_winning_strategy == :cut
-        cuts_edge = chase(EXTENDED_STATE[], state)
+        cuts_edge = @time chase(EXTENDED_STATE[], state)
     else 
         merged_graph = EXTENDED_STATE[].merged_graph
         if !(get_component!(merged_graph.components, shorts_edge.u.id) == get_component!(merged_graph.components, merged_graph.s.id) && get_component!(merged_graph.components, shorts_edge.v.id) == get_component!(merged_graph.components, merged_graph.t.id) 
@@ -49,10 +49,10 @@ function weighted_cut(state::GameState)::Edge
         who_can_win(EXTENDED_STATE[], false)
         if EXTENDED_STATE[].has_winning_strategy == :cut  #false, da für cut Gewichtung nicht interessant, falls optimale Strategie existiert (sofern Strafe für short hoch genug - hoffe ich mal)
             EXTENDED_STATE[].first_optimal_move = true 
-            cuts_edge = chase(EXTENDED_STATE[], state)
+            cuts_edge = @time chase(EXTENDED_STATE[], state)
         else
             end_time = time()   
-            cuts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.7 - (end_time - start_time))
+            cuts_edge = @time MCTS(EXTENDED_STATE[], state, time_limit = 1.7 - (end_time - start_time))
         end 
     end 
     delete!(EXTENDED_STATE[].merged_graph.edges, cuts_edge)
@@ -67,7 +67,7 @@ function weighted_short(state::GameState)::Edge
         e2 = Edge(-2, state.graph.s, state.graph.t, 0.0, :neutral)
         short_graph = GameGraph(Vector{Vertex}(), Vector{Edge}(), state.graph.s, state.graph.t)
         short_graph.vertices = state.graph.vertices
-        graph = EfficientGameGraph(Base.Set(state.graph.edges), ComponentTracker(Vector{Int}(), Vector{Int}(), Dict{Int, Int}(), Vector{Int}()), state.graph.s, state.graph.t) 
+        graph = EfficientGameGraph(Base.Set(state.graph.edges), ComponentTracker(Int[]), state.graph.s, state.graph.t) 
         merged_graph = EfficientGameGraph(Base.Set(state.graph.edges), ComponentTracker([v.id for v in state.graph.vertices]), state.graph.s, state.graph.t) 
         EXTENDED_STATE[] = ExtendedGameState(graph, merged_graph, short_graph, Base.Set{Edge}(), Base.Set{Edge}(), e1, e2, :neutral, :short, false, Base.Set{Edge}(), nothing)
     end 
@@ -82,7 +82,7 @@ function weighted_short(state::GameState)::Edge
         push!(short_graph.edges, shorts_old_edge) # die letzte Kante von short wird in den short_graph eingefügt, damit die Zusammenhangskomponenten korrekt sind
     end
     end_time = time()
-    shorts_edge = MCTS(EXTENDED_STATE[], state, time_limit = 1.7 - (end_time - start_time)) 
+    shorts_edge = @time MCTS(EXTENDED_STATE[], state, time_limit = 1.7 - (end_time - start_time)) 
     return shorts_edge
 end
 
@@ -112,33 +112,47 @@ function MCTS(state::ExtendedGameState, orig_state::GameState; time_limit = 1.0)
 
     save_base_state!(state.merged_graph.components)
     ws = DijkstraWorkspace(50)
-    # iterations = 0
+    untried_actions = Vector{Edge}()
+    sizehint!(untried_actions, length(state.merged_graph.edges))
+    iterations = 0
     while true
         if time() - start_time >= time_limit
             break 
         end
-        untried_actions = [edge for edge in state.merged_graph.edges if get_component!(state.merged_graph.components, edge.u.id) == s_component || get_component!(state.merged_graph.components, edge.v.id) == s_component || get_component!(state.merged_graph.components, edge.u.id) == t_component || get_component!(state.merged_graph.components, edge.v.id) == t_component]
+        empty!(untried_actions)
+        for edge in state.merged_graph.edges
+            if get_component!(state.merged_graph.components, edge.u.id) == s_component || 
+               get_component!(state.merged_graph.components, edge.v.id) == s_component || 
+               get_component!(state.merged_graph.components, edge.u.id) == t_component || 
+               get_component!(state.merged_graph.components, edge.v.id) == t_component
+           
+               push!(untried_actions, edge)
+            end
+        end
         if isempty(untried_actions)
-            untried_actions = valid_moves(orig_state)
+            append!(untried_actions, valid_moves(orig_state))
         end
         root_node.visits += 1
         node = select(root_node, short_graph, short_merged_graph, untried_actions, tracker)
         if node.terminal
             backpropagate!(node, node.total_weight_at_end / (node.visits - 1), tracker, short_graph, short_merged_graph)
-            # iterations += 1
+            restore_base_state!(state.merged_graph.components)
+            iterations += 1
             continue
         end
         node = expand!(node, short_graph, short_merged_graph, untried_actions, ws)
         if node[2] != -1 # dann ist der expandierte Zustand ein Endzustand
             backpropagate!(node[1], node[2], tracker, short_graph, short_merged_graph)
-            # iterations += 1
+            restore_base_state!(state.merged_graph.components)
+            iterations += 1
             continue
         end
         weight = simulate!(node[1], short_graph, short_merged_graph, untried_actions, ws)
         backpropagate!(node[1], weight, tracker, short_graph, short_merged_graph)
-        # iterations += 1
+        restore_base_state!(state.merged_graph.components)
+        iterations += 1
     end
-    # println("Der Computer hat ", iterations, " viele Iterationen geschafft.")
+    println("Der Computer hat ", iterations, " viele Iterationen geschafft.")
     max_child = argmax(x -> x.visits, root_node.children)
     return max_child.last_move
 end 
@@ -246,7 +260,6 @@ function backpropagate!(node::MCTS_node, weight_at_end::Float64, tracker::ValueT
     current_node = node
     while !isnothing(current_node) # wird immer mit mindestens Kindknoten von root aufgerufen
         current_node.total_weight_at_end += weight_at_end
-        undo_move!(short_graph, short_merged_graph, current_node.last_move, current_node.current_player)
 
         if current_node.visits > 0
             q_current = current_node.total_weight_at_end / current_node.visits
@@ -257,9 +270,13 @@ function backpropagate!(node::MCTS_node, weight_at_end::Float64, tracker::ValueT
                 tracker.Q_max = q_current
             end
         end
+
+        if !isnothing(current_node.parent)
+            undo_move!(short_graph, short_merged_graph, current_node.last_move, current_node.parent.current_player)
+        end
+        
         current_node = current_node.parent
     end
-    restore_base_state!(state.merged_graph.components)
 end
 
 function make_move!(short_graph::GameGraph, short_merged_graph::EfficientGameGraph, untried_actions::Vector{Edge}, move::Edge, player::Symbol)
@@ -308,7 +325,9 @@ end
 
 function undo_move!(short_graph::GameGraph, short_merged_graph::EfficientGameGraph, move::Edge, player::Symbol)
     if player == :short
-        delete!(short_graph.edges, move)
+        pos = findfirst(x->x.id == move.id, short_graph.edges)
+        short_graph.edges[pos] = short_graph.edges[end]
+        pop!(short_graph.edges)
         push!(short_merged_graph.edges, move)
     else
         push!(short_merged_graph.edges, move)
