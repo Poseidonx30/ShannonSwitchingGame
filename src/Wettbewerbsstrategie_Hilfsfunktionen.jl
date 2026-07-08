@@ -3,21 +3,16 @@ const punishment = 5000
 struct ComponentTracker
     parent::Vector{Int}
     size::Vector{Int}
-    base_parent::Vector{Int} # Snapshot-Speicher
-    base_size::Vector{Int}   # Snapshot-Speicher
     id_to_idx::Dict{Int, Int}
     idx_to_id::Vector{Int}
 
-    ComponentTracker(p, s, bp, bs, id2idx, idx2id) = new(p, s, bp, bs, id2idx, idx2id)
+    ComponentTracker(p, s, id2idx, idx2id) = new(p, s, id2idx, idx2id)
 
     function ComponentTracker(vertex_ids::Vector{Int})
         n = length(vertex_ids)
         parent = collect(1:n)
         size = fill(1, n)
         
-        # Die Snapshot-Arrays werden einmalig mit der gleichen Größe angelegt
-        base_parent = collect(1:n)
-        base_size = fill(1, n)
         
         id_to_idx = Dict{Int, Int}()
         sizehint!(id_to_idx, n)
@@ -28,7 +23,7 @@ struct ComponentTracker
             idx_to_id[idx] = id
         end
     
-        return new(parent, size, base_parent, base_size, id_to_idx, idx_to_id)
+        return new(parent, size, id_to_idx, idx_to_id)
     end
 end
 
@@ -54,7 +49,7 @@ mutable struct ExtendedGameState
     winner::Union{Symbol, Nothing}
 end
 
-Base.copy(ct::ComponentTracker)::ComponentTracker = ComponentTracker(copy(ct.parent), copy(ct.size), copy(ct.base_parent), copy(ct.base_size), copy(ct.id_to_idx), copy(ct.idx_to_id))
+Base.copy(ct::ComponentTracker)::ComponentTracker = ComponentTracker(copy(ct.parent), copy(ct.size), copy(ct.id_to_idx), copy(ct.idx_to_id))
 
 Base.copy(g::GameGraph)::GameGraph = GameGraph(copy(g.vertices), copy(g.edges), g.s, g.t)
 
@@ -102,17 +97,6 @@ function merge_components!(ct::ComponentTracker, u_id::Int, v_id::Int)
     end
 end
 
-function save_base_state!(ct::ComponentTracker)
-    # Speichert den aktuellen Zustand blitzschnell und ohne Allocations
-    copyto!(ct.base_parent, ct.parent)
-    copyto!(ct.base_size, ct.size)
-end
-
-function restore_base_state!(ct::ComponentTracker)
-    # Überschreibt die aktuellen Arrays wieder mit dem gespeicherten Zustand
-    copyto!(ct.parent, ct.base_parent)
-    copyto!(ct.size, ct.base_size)
-end
 
 function check_st_connection(G::EfficientGameGraph)::Bool
     if get_component!(G.components, G.s.id) == get_component!(G.components, G.t.id)
@@ -170,7 +154,7 @@ function FC(Sehne::Edge, Spannbaum::Base.Set{Edge}, components::ComponentTracker
         push!(get!(adj, root_v, Tuple{Int, Edge}[]), (root_u, e))
     end
 
-    # Pfadsuche mittels DFS  -  meine Version war wohl nicht sehr effizient 
+    # Pfadsuche mittels DFS  
     parent_map = Dict{Int, Tuple{Int, Edge}}() # Wir speichern: parent_node[node] = (predecessor_node, edge_that_connected_them)
     visited = Set{Int}([start_root])
     stack = [start_root]
@@ -376,8 +360,7 @@ function min_heapify!(A::MinHeap, i::Int)
     return A
 end
 
-function extract_min!(A::MinHeap)
-    A.size == 0 && error("Heap ist leer")   
+function extract_min!(A::MinHeap)  
     min_elem = A.elements[1]    
     
     A.elements[1] = A.elements[A.size]
@@ -391,8 +374,7 @@ function extract_min!(A::MinHeap)
     return min_elem
 end
 
-function decrease_key!(A::MinHeap, i::Int, k::Float64)
-    A.elements[i][2] < k && error("Neuer Wert ist größer als aktueller Wert")    
+function decrease_key!(A::MinHeap, i::Int, k::Float64)  
     A.elements[i] = (A.elements[i][1], k)   
     while i > 1
         parent = i ÷ 2
@@ -426,7 +408,7 @@ struct DijkstraWorkspace
     heap::MinHeap
 end
 
-function DijkstraWorkspace(max_nodes::Int = 50)
+function DijkstraWorkspace(max_nodes::Int = 70)
     adj = [Tuple{Int, Float64}[] for _ in 1:max_nodes]
     dist = fill(Inf, max_nodes)
     elems = Vector{Tuple{Int, Float64}}(undef, max_nodes)
@@ -496,38 +478,9 @@ function dijkstra(g::GameGraph, s::Vertex, t::Vertex, ws::DijkstraWorkspace)::Fl
 end
 
 using BenchmarkTools
-#####################################################################TEST FÜR MINHEAP###############################################
-#= println("Generiere Testdaten...")
-N = 10_000  # Anzahl der Elemente im Heap
-test_elements = [(i, rand()) for i in 1:N]
-heap = MinHeap(Tuple{Int,Float64}[], 0, zeros(Int, N)) #für optimierte Version
-println("\n--- Benchmark: insert! ---")
-@btime begin
-    h = MinHeap(Tuple{Int,Float64}[], 0, Int[])
-    insert!(h, $test_elements)
-end
-insert!(heap, test_elements)
-println("\n--- Benchmark: decrease_key! ---")
-target_id = 5000
-position_in_heap = heap.position[target_id]
-@btime decrease_key!($heap, $position_in_heap, 0.0)
-println("\n--- Benchmark: extract_min! ---")
-@btime begin
-    # deepcopy ist nötig, da Dicts und Vektoren kopiert werden müssen
-    h_copy = deepcopy($heap) 
-    extract_min!(h_copy)
-end =#
-##########################################################################TEST FÜR DIJKSTRA##################################################
-#= n = 1000
-m = 1500
-println("Generiere Zufallsgraphen mit $n Knoten und $m Kanten...")
-g = random_graph(n, m, weighted = true)
-println("Benchmark startet. Das kann einen Moment dauern...")
-# 3. Dijkstra benchmarken
-@btime dijkstra($g, $g.s, $g.t) =#
 
 #########################################################################BENCHMARK SPIELE###########################################################
-const OUTFILE = "benchmark_neu_1.3.txt"
+#= onst OUTFILE = "benchmark_neu_1.3.txt"
 const ERRORFILE = "errors_neu_1.3.txt"
 
 # Dateien initialisieren (Errorlog leeren)
@@ -677,6 +630,235 @@ function test()
             println(io, "Mittlere Punktzahl (Rand): $(round(mean_points_random, digits=2))")
             println(io, "Mittlere Computerzugzeit:  $(round(mean_computer_time, digits=2)) ms")
             println(io, "Maximale Computerzugzeit:  $(round(global_max_computer_time, digits=2)) ms")
+            println(io, "========================================")
+        end
+        i += 1
+    end
+end =#
+
+const OUTFILE = "benchmark_neu_2vsGemini.txt"
+const ERRORFILE = "errors_neu_2vsGemini.txt"
+
+# Dateien initialisieren (Errorlog leeren)
+open(ERRORFILE, "w") do io
+    println(io, "Fehlerlog gestartet\n")
+end
+
+function test()
+    mcts1_wins = 0
+    mcts2_wins = 0
+
+    mcts1_points_as_short = 0.0
+    mcts2_points_as_short = 0.0
+
+    # Timing and move stats for MCTS 1
+    total_mcts1_moves = 0
+    mcts1_move_time_sum = 0.0
+    global_max_mcts1_time = 0.0
+
+    # Timing and move stats for MCTS 2
+    total_mcts2_moves = 0
+    mcts2_move_time_sum = 0.0
+    global_max_mcts2_time = 0.0
+
+    i = 1
+    while i ≤ 20 # Limit nach Bedarf anpassen
+
+        n = rand(6:25)
+        m = rand(floor(Int, 1.5*n):min(2n - 1))
+
+        g = random_graph(n, m, weighted = true)
+
+        ####################################################
+        # Game 1: MCTS2 (Short) vs MCTS1 (Cut)
+        ####################################################
+
+        game = new_game(d_copy(g))
+        len = length(valid_moves(game))
+
+        while len ≥ 1
+            # Player 1 (Short): Now uses MCTS2
+            try
+                t1 = time_ns()
+                make_move!(game, weighted_short(game))
+                t2 = time_ns()
+
+                dt = (t2 - t1) / 1e6
+                dt ≥ 2000 && println("MCTS2 short ", n, m)
+                total_mcts2_moves += 1
+                mcts2_move_time_sum += dt
+                if dt > global_max_mcts2_time
+                    global_max_mcts2_time = dt
+                end
+            catch e
+                open(ERRORFILE, "a") do io
+                    println(io, "ERROR in weighted_short2 (Spiel $i)")
+                    println(io, "n=$n, m=$m")
+                    for (exc, bt) in current_exceptions()
+                        showerror(io, exc, bt)
+                        println(io)
+                    end
+                    println(io, "\n")
+                end 
+            end
+            
+            len -= 1
+
+            # Player 2 (Cut): Uses MCTS1
+            if len ≥ 1
+                try
+                    t1 = time_ns()
+                    make_move!(game, weighted_cut3(game))
+                    t2 = time_ns()
+
+                    dt = (t2 - t1) / 1e6
+                    dt ≥ 2000 && println("MCTS1 cut ", n, m)
+                    total_mcts1_moves += 1
+                    mcts1_move_time_sum += dt
+                    if dt > global_max_mcts1_time
+                        global_max_mcts1_time = dt
+                    end
+                catch e
+                    open(ERRORFILE, "a") do io
+                        println(io, "ERROR in weighted_cut (Spiel $i)")
+                        println(io, "n=$n, m=$m")
+                        for (exc, bt) in current_exceptions()
+                            showerror(io, exc, bt)
+                            println(io)
+                        end
+                        println(io, "\n")
+                    end 
+                end
+
+                len -= 1
+            end
+        end
+
+        # Final s-t path length when MCTS2 was playing Short
+        points_mcts2_short = dijkstra(
+            game.short_Graph,
+            game.short_Graph.s,
+            game.short_Graph.t,
+            DijkstraWorkspace(70)
+        )
+
+        ####################################################
+        # Game 2: MCTS1 (Short) vs MCTS2 (Cut)
+        ####################################################
+
+        game = new_game(d_copy(g))
+        len = length(valid_moves(game))
+        
+        while len ≥ 1
+            # Player 1 (Short): Uses MCTS1
+            try
+                t1 = time_ns()
+                make_move!(game, weighted_short3(game))
+                t2 = time_ns()
+
+                dt = (t2 - t1) / 1e6
+                dt ≥ 2000 && println("MCTS1 short ", n, m)
+                total_mcts1_moves += 1
+                mcts1_move_time_sum += dt
+                if dt > global_max_mcts1_time
+                    global_max_mcts1_time = dt
+                end
+            catch e
+                open(ERRORFILE, "a") do io
+                    println(io, "ERROR in weighted_short (Spiel $i)")
+                    println(io, "n=$n, m=$m")
+                    for (exc, bt) in current_exceptions()
+                        showerror(io, exc, bt)
+                        println(io)
+                    end
+                    println(io, "\n")
+                end 
+            end
+
+            len -= 1
+
+            # Player 2 (Cut): Now uses MCTS2
+            if len ≥ 1
+                try
+                    t1 = time_ns()
+                    make_move!(game, weighted_cut(game))
+                    t2 = time_ns()
+
+                    dt = (t2 - t1) / 1e6
+                    dt ≥ 2000 && println("MCTS2 cut ", n, m)
+                    total_mcts2_moves += 1
+                    mcts2_move_time_sum += dt
+                    if dt > global_max_mcts2_time
+                        global_max_mcts2_time = dt
+                    end
+                catch e
+                    open(ERRORFILE, "a") do io
+                        println(io, "ERROR in weighted_cut2 (Spiel $i)")
+                        println(io, "n=$n, m=$m")
+                        for (exc, bt) in current_exceptions()
+                            showerror(io, exc, bt)
+                            println(io)
+                        end
+                        println(io, "\n")
+                    end 
+                end
+
+                len -= 1
+            end
+        end
+
+        # Final s-t path length when MCTS1 was playing Short
+        points_mcts1_short = dijkstra(
+            game.short_Graph,
+            game.short_Graph.s,
+            game.short_Graph.t,
+            DijkstraWorkspace(70)
+        )
+
+        ####################################################
+        # Statistik & Gewinner ermitteln
+        ####################################################
+
+        # Short wants to minimize path length. Whichever version achieved a 
+        # lower score when playing as Short wins the round comparison.
+        if points_mcts1_short < points_mcts2_short
+            mcts1_wins += 1
+        elseif points_mcts1_short > points_mcts2_short
+            mcts2_wins += 1
+        else
+            mcts1_wins += 1
+            mcts2_wins += 1
+        end 
+
+        mcts1_points_as_short += points_mcts1_short
+        mcts2_points_as_short += points_mcts2_short
+
+        win_percentage_mcts1 = (mcts1_wins / i) * 100
+        win_percentage_mcts2 = (mcts2_wins / i) * 100
+        mean_points_mcts1    = mcts1_points_as_short / i
+        mean_points_mcts2    = mcts2_points_as_short / i
+        
+        mean_mcts1_time = total_mcts1_moves > 0 ? (mcts1_move_time_sum / total_mcts1_moves) : 0.0
+        mean_mcts2_time = total_mcts2_moves > 0 ? (mcts2_move_time_sum / total_mcts2_moves) : 0.0
+
+        ####################################################
+        # Benchmark Output (Überschreibt die Datei jedes Mal)
+        ####################################################
+
+        open(OUTFILE, "w") do io
+            println(io, "========================================")
+            println(io, "Spiele bis jetzt gespielt: $i")
+            println(io, "----------------------------------------")
+            println(io, "MCTS 1 Siegesquote:        $(round(win_percentage_mcts1, digits=2)) %")
+            println(io, "MCTS 2 Siegesquote:        $(round(win_percentage_mcts2, digits=2)) %")
+            println(io, "----------------------------------------")
+            println(io, "Mittlere Punkte als Short (MCTS 1): $(round(mean_points_mcts1, digits=2))")
+            println(io, "Mittlere Punkte als Short (MCTS 2): $(round(mean_points_mcts2, digits=2))")
+            println(io, "----------------------------------------")
+            println(io, "Mittlere Zugzeit (MCTS 1):  $(round(mean_mcts1_time, digits=2)) ms")
+            println(io, "Mittlere Zugzeit (MCTS 2):  $(round(mean_mcts2_time, digits=2)) ms")
+            println(io, "Maximale Zugzeit (MCTS 1):  $(round(global_max_mcts1_time, digits=2)) ms")
+            println(io, "Maximale Zugzeit (MCTS 2):  $(round(global_max_mcts2_time, digits=2)) ms")
             println(io, "========================================")
         end
         i += 1
