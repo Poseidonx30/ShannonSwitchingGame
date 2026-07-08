@@ -1,4 +1,4 @@
-const punishment = 160.0
+const punishment = 5000
 
 struct ComponentTracker
     parent::Vector{Int}
@@ -547,7 +547,7 @@ function test()
     global_max_computer_time = 0.0
 
     i = 1
-    while i ≤ 2 # Limit nach Bedarf anpassen
+    while i ≤ 200 # Limit nach Bedarf anpassen
 
         n = rand(6:25)
         m = rand(floor(Int, 1.5*n):min(2n - 1))
@@ -598,7 +598,7 @@ function test()
             game.short_Graph,
             game.short_Graph.s,
             game.short_Graph.t,
-            DijkstraWorkspace(50)
+            DijkstraWorkspace(100)
         )
         
         ####################################################
@@ -644,7 +644,7 @@ function test()
         points_computer = dijkstra(
             game.short_Graph,
             game.short_Graph.s,
-            game.short_Graph.t, DijkstraWorkspace(50)
+            game.short_Graph.t, DijkstraWorkspace(100)
         )
 
         ####################################################
