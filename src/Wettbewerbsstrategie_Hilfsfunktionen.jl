@@ -1,18 +1,23 @@
-const punishment = 5000
+const punishment = 160.0
 
 struct ComponentTracker
     parent::Vector{Int}
     size::Vector{Int}
+    base_parent::Vector{Int} # Snapshot-Speicher
+    base_size::Vector{Int}   # Snapshot-Speicher
     id_to_idx::Dict{Int, Int}
     idx_to_id::Vector{Int}
 
-    ComponentTracker(p, s, id2idx, idx2id) = new(p, s, id2idx, idx2id)
+    ComponentTracker(p, s, bp, bs, id2idx, idx2id) = new(p, s, bp, bs, id2idx, idx2id)
 
     function ComponentTracker(vertex_ids::Vector{Int})
         n = length(vertex_ids)
         parent = collect(1:n)
         size = fill(1, n)
         
+        # Die Snapshot-Arrays werden einmalig mit der gleichen Größe angelegt
+        base_parent = collect(1:n)
+        base_size = fill(1, n)
         
         id_to_idx = Dict{Int, Int}()
         sizehint!(id_to_idx, n)
@@ -23,7 +28,7 @@ struct ComponentTracker
             idx_to_id[idx] = id
         end
     
-        return new(parent, size, id_to_idx, idx_to_id)
+        return new(parent, size, base_parent, base_size, id_to_idx, idx_to_id)
     end
 end
 
@@ -49,7 +54,7 @@ mutable struct ExtendedGameState
     winner::Union{Symbol, Nothing}
 end
 
-Base.copy(ct::ComponentTracker)::ComponentTracker = ComponentTracker(copy(ct.parent), copy(ct.size), copy(ct.id_to_idx), copy(ct.idx_to_id))
+Base.copy(ct::ComponentTracker)::ComponentTracker = ComponentTracker(copy(ct.parent), copy(ct.size), copy(ct.base_parent), copy(ct.base_size), copy(ct.id_to_idx), copy(ct.idx_to_id))
 
 Base.copy(g::GameGraph)::GameGraph = GameGraph(copy(g.vertices), copy(g.edges), g.s, g.t)
 
@@ -97,6 +102,17 @@ function merge_components!(ct::ComponentTracker, u_id::Int, v_id::Int)
     end
 end
 
+function save_base_state!(ct::ComponentTracker)
+    # Speichert den aktuellen Zustand blitzschnell und ohne Allocations
+    copyto!(ct.base_parent, ct.parent)
+    copyto!(ct.base_size, ct.size)
+end
+
+function restore_base_state!(ct::ComponentTracker)
+    # Überschreibt die aktuellen Arrays wieder mit dem gespeicherten Zustand
+    copyto!(ct.parent, ct.base_parent)
+    copyto!(ct.size, ct.base_size)
+end
 
 function check_st_connection(G::EfficientGameGraph)::Bool
     if get_component!(G.components, G.s.id) == get_component!(G.components, G.t.id)
@@ -154,7 +170,7 @@ function FC(Sehne::Edge, Spannbaum::Base.Set{Edge}, components::ComponentTracker
         push!(get!(adj, root_v, Tuple{Int, Edge}[]), (root_u, e))
     end
 
-    # Pfadsuche mittels DFS  
+    # Pfadsuche mittels DFS  -  meine Version war wohl nicht sehr effizient 
     parent_map = Dict{Int, Tuple{Int, Edge}}() # Wir speichern: parent_node[node] = (predecessor_node, edge_that_connected_them)
     visited = Set{Int}([start_root])
     stack = [start_root]
@@ -360,7 +376,8 @@ function min_heapify!(A::MinHeap, i::Int)
     return A
 end
 
-function extract_min!(A::MinHeap)  
+function extract_min!(A::MinHeap)
+    A.size == 0 && error("Heap ist leer")   
     min_elem = A.elements[1]    
     
     A.elements[1] = A.elements[A.size]
@@ -374,7 +391,8 @@ function extract_min!(A::MinHeap)
     return min_elem
 end
 
-function decrease_key!(A::MinHeap, i::Int, k::Float64)  
+function decrease_key!(A::MinHeap, i::Int, k::Float64)
+    A.elements[i][2] < k && error("Neuer Wert ist größer als aktueller Wert")    
     A.elements[i] = (A.elements[i][1], k)   
     while i > 1
         parent = i ÷ 2
@@ -408,7 +426,7 @@ struct DijkstraWorkspace
     heap::MinHeap
 end
 
-function DijkstraWorkspace(max_nodes::Int = 70)
+function DijkstraWorkspace(max_nodes::Int = 50)
     adj = [Tuple{Int, Float64}[] for _ in 1:max_nodes]
     dist = fill(Inf, max_nodes)
     elems = Vector{Tuple{Int, Float64}}(undef, max_nodes)
@@ -476,6 +494,7 @@ function dijkstra(g::GameGraph, s::Vertex, t::Vertex, ws::DijkstraWorkspace)::Fl
     
     return punishment
 end
+
 
 using BenchmarkTools
 
